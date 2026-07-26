@@ -1,4 +1,4 @@
-# ADR 003: Extend Bart with semantic registered actions
+# ADR 003: Extend Agent with semantic registered actions
 
 Status: accepted
 

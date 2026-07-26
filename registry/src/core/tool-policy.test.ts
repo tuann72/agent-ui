@@ -6,9 +6,9 @@ import {
   validateRoute,
   validateTarget,
 } from "./tool-policy";
-import type { BartPublicManifest } from "./types";
+import type { AgentPublicManifest } from "./types";
 
-const manifest: BartPublicManifest = {
+const manifest: AgentPublicManifest = {
   routes: [
     { route: "/", title: "Home", description: "", targets: [{ id: "hero", description: "" }] },
     {

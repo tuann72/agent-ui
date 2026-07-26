@@ -9,22 +9,26 @@ import {
   type ReactNode,
 } from "react";
 import {
-  useBartChat,
-  type UseBartChatOptions,
-  type UseBartChatReturn,
-} from "../core/use-bart-chat";
-import type { BartAppearance, BartStarterPrompt } from "../core/types";
-import { BartIcon } from "./icons";
+  useAgentChat,
+  type UseAgentChatOptions,
+  type UseAgentChatReturn,
+} from "../core/use-agent-chat";
+import type {
+  AgentAppearance,
+  AgentSelectionSide,
+  AgentStarterPrompt,
+} from "../core/types";
+import { AgentIcon } from "./icons";
 
 /**
- * Shared state every Bart component reads. `BartProvider` runs the headless
+ * Shared state every Agent component reads. `AgentProvider` runs the headless
  * core and owns the panel's open state; the shells and the composable parts
  * (title, header, messages, input, action buttons) consume it from here rather
  * than through prop drilling, so a consumer can rearrange the pieces freely.
- * Security still lives entirely in `useBartChat` — the parts are presentation.
+ * Security still lives entirely in `useAgentChat` — the parts are presentation.
  */
-export interface BartContextValue {
-  bart: UseBartChatReturn;
+export interface AgentContextValue {
+  agent: UseAgentChatReturn;
   /** Whether the shell panel is open. */
   open: boolean;
   setOpen: (open: boolean) => void;
@@ -33,21 +37,25 @@ export interface BartContextValue {
   /** Brand mark rendered next to the title everywhere one appears. */
   icon: ReactNode;
   /** Surface finish shared by the shell's panel(s). */
-  appearance: BartAppearance;
+  appearance: AgentAppearance;
   /** Contextual task suggestions shown before the first message. */
-  starterPrompts: readonly BartStarterPrompt[];
+  starterPrompts: readonly AgentStarterPrompt[];
+  /** Which edge of a text selection the "Ask" popover attaches to. */
+  selectionSide: AgentSelectionSide;
   /** Attach selected page text and open the shell — used by the popover. */
   askAboutSelection: (text: string) => void;
+  /** Attach selected page text without changing the current shell state. */
+  addSelectionContext: (text: string) => void;
 }
 
-const BartContext = createContext<BartContextValue | null>(null);
+const AgentContext = createContext<AgentContextValue | null>(null);
 
-/** Read the shared Bart state. Throws outside a `<BartProvider>`/`<BartChat>`. */
-export function useBartContext(): BartContextValue {
-  const value = useContext(BartContext);
+/** Read the shared Agent state. Throws outside a `<AgentProvider>`/`<AgentChat>`. */
+export function useAgentContext(): AgentContextValue {
+  const value = useContext(AgentContext);
   if (!value) {
     throw new Error(
-      "Bart components must be rendered inside <BartProvider> (or <BartChat>).",
+      "Agent components must be rendered inside <AgentProvider> (or <AgentChat>).",
     );
   }
   return value;
@@ -55,17 +63,17 @@ export function useBartContext(): BartContextValue {
 
 /**
  * Per-shell context carrying the mounted panel's motion-aware `close`. It is
- * separate from `BartContext` because only a component rendered inside a shell
+ * separate from `AgentContext` because only a component rendered inside a shell
  * can play that shell's exit animation; everything else closes by flipping the
  * shared open state.
  */
-interface BartShellContextValue {
+interface AgentShellContextValue {
   close: () => void;
 }
-const BartShellContext = createContext<BartShellContextValue | null>(null);
+const AgentShellContext = createContext<AgentShellContextValue | null>(null);
 
 /** Each shell wraps its panel contents in this so `<CloseButton>` can animate. */
-export function BartShellProvider({
+export function AgentShellProvider({
   close,
   children,
 }: {
@@ -74,32 +82,34 @@ export function BartShellProvider({
 }) {
   const value = useMemo(() => ({ close }), [close]);
   return (
-    <BartShellContext.Provider value={value}>
+    <AgentShellContext.Provider value={value}>
       {children}
-    </BartShellContext.Provider>
+    </AgentShellContext.Provider>
   );
 }
 
 /**
- * Close Bart from a composable button. Inside a shell this plays the panel's
+ * Close Agent from a composable button. Inside a shell this plays the panel's
  * exit animation; outside one (no shell context) it falls back to flipping the
  * shared open state.
  */
-export function useCloseBart(): () => void {
-  const shell = useContext(BartShellContext);
-  const { setOpen } = useBartContext();
+export function useCloseAgent(): () => void {
+  const shell = useContext(AgentShellContext);
+  const { setOpen } = useAgentContext();
   return shell ? shell.close : () => setOpen(false);
 }
 
-export interface BartProviderProps extends UseBartChatOptions {
-  /** Display name shown everywhere the shell names itself. Default `"Bart"`. */
+export interface AgentProviderProps extends UseAgentChatOptions {
+  /** Display name shown everywhere the shell names itself. Default `"Agent"`. */
   title?: string;
-  /** Brand mark; any node. Defaults to the Bart ring mark. */
+  /** Brand mark; any node. Defaults to the Agent ring mark. */
   icon?: ReactNode;
   /** Surface finish: opaque `"default"` or backdrop-blur `"glass"`. */
-  appearance?: BartAppearance;
+  appearance?: AgentAppearance;
   /** Contextual task suggestions shown before the first message. */
-  starterPrompts?: readonly BartStarterPrompt[];
+  starterPrompts?: readonly AgentStarterPrompt[];
+  /** Edge of the selection the "Ask" popover attaches to. Default `"top"`. */
+  selectionSide?: AgentSelectionSide;
   /** Controlled open state. Omit for uncontrolled (starts from `defaultOpen`). */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -110,21 +120,22 @@ export interface BartProviderProps extends UseBartChatOptions {
 
 // Module constants, not inline defaults: default parameter values are
 // re-created every render and would invalidate the context memo below.
-const DEFAULT_ICON = <BartIcon />;
-const NO_STARTER_PROMPTS: readonly BartStarterPrompt[] = [];
+const DEFAULT_ICON = <AgentIcon />;
+const NO_STARTER_PROMPTS: readonly AgentStarterPrompt[] = [];
 
-export function BartProvider({
-  title = "Bart",
+export function AgentProvider({
+  title = "Agent",
   icon = DEFAULT_ICON,
   appearance = "default",
   starterPrompts = NO_STARTER_PROMPTS,
+  selectionSide = "top",
   open: controlledOpen,
   onOpenChange,
   defaultOpen = false,
   children,
   ...chatOptions
-}: BartProviderProps) {
-  const bart = useBartChat(chatOptions);
+}: AgentProviderProps) {
+  const agent = useAgentChat(chatOptions);
   const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen);
   const isControlled = controlledOpen !== undefined;
   const open = isControlled ? controlledOpen : uncontrolledOpen;
@@ -139,25 +150,39 @@ export function BartProvider({
 
   const askAboutSelection = useCallback(
     (text: string) => {
-      bart.attachQuote(text);
+      agent.attachQuote(text);
       setOpen(true);
     },
-    [bart.attachQuote, setOpen],
+    [agent.attachQuote, setOpen],
   );
+  const addSelectionContext = agent.attachQuote;
 
-  const value = useMemo<BartContextValue>(
+  const value = useMemo<AgentContextValue>(
     () => ({
-      bart,
+      agent,
       open,
       setOpen,
       title,
       icon,
       appearance,
       starterPrompts,
+      selectionSide,
       askAboutSelection,
+      addSelectionContext,
     }),
-    [bart, open, setOpen, title, icon, appearance, starterPrompts, askAboutSelection],
+    [
+      agent,
+      open,
+      setOpen,
+      title,
+      icon,
+      appearance,
+      starterPrompts,
+      selectionSide,
+      askAboutSelection,
+      addSelectionContext,
+    ],
   );
 
-  return <BartContext.Provider value={value}>{children}</BartContext.Provider>;
+  return <AgentContext.Provider value={value}>{children}</AgentContext.Provider>;
 }

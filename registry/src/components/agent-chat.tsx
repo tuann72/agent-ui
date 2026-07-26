@@ -1,24 +1,25 @@
 "use client";
 
 import type { ReactNode } from "react";
-import type { UseBartChatOptions } from "../core/use-bart-chat";
+import type { UseAgentChatOptions } from "../core/use-agent-chat";
 import type {
-  BartAppearance,
-  BartStarterPrompt,
-  BartVariant,
+  AgentAppearance,
+  AgentSelectionSide,
+  AgentStarterPrompt,
+  AgentVariant,
 } from "../core/types";
-import { BartProvider } from "./bart-provider";
-import { BartDock } from "./dock";
-import { BartSidebar, type SidebarLauncher } from "./sidebar";
-import { BartSelectionPopover } from "./selection-popover";
-import { BartSpotlight } from "./spotlight";
+import { AgentProvider } from "./agent-provider";
+import { AgentDock } from "./dock";
+import { AgentSidebar, type SidebarLauncher } from "./sidebar";
+import { AgentSelectionPopover } from "./selection-popover";
+import { AgentSpotlight } from "./spotlight";
 
-export interface BartChatProps extends UseBartChatOptions {
-  variant?: BartVariant;
+export interface AgentChatProps extends UseAgentChatOptions {
+  variant?: AgentVariant;
   /** The shell's display name: header/launcher text and aria labels. */
   title?: string;
   /** Surface finish: opaque `"default"` or backdrop-blur `"glass"`. */
-  appearance?: BartAppearance;
+  appearance?: AgentAppearance;
   /** Brand mark next to the title everywhere one is shown. Any node. */
   icon?: ReactNode;
   /** Dock/sidebar screen edge. */
@@ -31,19 +32,21 @@ export interface BartChatProps extends UseBartChatOptions {
   inputSeparator?: boolean;
   /** Spotlight open key. */
   shortcutKey?: string;
-  /** Show an "Ask Bart" popup when page text is selected. Default on. */
+  /** Show an "Ask Agent" popup when page text is selected. Default on. */
   selectionAsk?: boolean;
+  /** Which edge of the selection that popup sits on. Default `"top"`. */
+  selectionSide?: AgentSelectionSide;
   /** Contextual task suggestions shown before the first message. */
-  starterPrompts?: readonly BartStarterPrompt[];
+  starterPrompts?: readonly AgentStarterPrompt[];
 }
 
 /**
- * Batteries-included default composition: a `BartProvider` plus one variant
+ * Batteries-included default composition: a `AgentProvider` plus one variant
  * shell and the selection popover. Consumers who want to rearrange the pieces
  * (custom header actions, their own layout) can drop the `variant` prop and
- * compose `<BartProvider>` with the shell + parts directly.
+ * compose `<AgentProvider>` with the shell + parts directly.
  */
-export function BartChat({
+export function AgentChat({
   variant = "dock",
   // Cosmetic props are forwarded undefined so the provider and shells stay
   // the single source of their defaults (title, side, shortcut key, …).
@@ -56,33 +59,35 @@ export function BartChat({
   inputSeparator,
   shortcutKey,
   selectionAsk = true,
+  selectionSide,
   starterPrompts,
   ...chatOptions
-}: BartChatProps) {
+}: AgentChatProps) {
   const shell =
     variant === "sidebar" ? (
-      <BartSidebar
+      <AgentSidebar
         side={side}
         launcher={launcher}
         header={header}
         inputSeparator={inputSeparator}
       />
     ) : variant === "spotlight" ? (
-      <BartSpotlight shortcutKey={shortcutKey} />
+      <AgentSpotlight shortcutKey={shortcutKey} />
     ) : (
-      <BartDock side={side} header={header} inputSeparator={inputSeparator} />
+      <AgentDock side={side} header={header} inputSeparator={inputSeparator} />
     );
 
   return (
-    <BartProvider
+    <AgentProvider
       {...chatOptions}
       title={title}
       icon={icon}
       appearance={appearance}
       starterPrompts={starterPrompts}
+      selectionSide={selectionSide}
     >
-      {selectionAsk && <BartSelectionPopover />}
+      {selectionAsk && <AgentSelectionPopover />}
       {shell}
-    </BartProvider>
+    </AgentProvider>
   );
 }

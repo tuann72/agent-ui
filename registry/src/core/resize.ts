@@ -1,6 +1,6 @@
 /** Side-aware resize arithmetic shared by the dock and sidebar. DOM-free. */
 
-export type BartSide = "left" | "right";
+export type AgentSide = "left" | "right";
 
 export function clampSize(
   value: number,
@@ -15,7 +15,7 @@ export function clampSize(
  * screen edge, so dragging toward the middle of the page is what widens them:
  * leftward (negative dx) grows a right-side panel, rightward a left-side one.
  */
-export function growthFromPointer(side: BartSide, dx: number): number {
+export function growthFromPointer(side: AgentSide, dx: number): number {
   return side === "right" ? -dx : dx;
 }
 
@@ -32,7 +32,7 @@ export interface ResizeKeyDelta {
 export function keyboardResizeDelta(
   key: string,
   shiftKey: boolean,
-  side: BartSide,
+  side: AgentSide,
 ): ResizeKeyDelta | null {
   const step = shiftKey ? 32 : 16;
   switch (key) {

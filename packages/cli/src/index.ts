@@ -1,6 +1,6 @@
 /**
- * @bart-ui/cli entry point. Bundled to dist/index.js by `bun build
- * --target=node` and executed through bin/bart.js under plain Node — no Bun
+ * @agent-ui/cli entry point. Bundled to dist/index.js by `bun build
+ * --target=node` and executed through bin/agent.js under plain Node — no Bun
  * APIs and no runtime dependencies may be used anywhere in src/.
  */
 
@@ -8,18 +8,18 @@ import { readFileSync } from "node:fs";
 import { runInit } from "./init";
 import { CliError } from "./lib";
 
-const HELP = `bart — scaffold the Bart assistant into your React project
+const HELP = `agent — scaffold the Agent assistant into your React project
 
 Usage:
-  npx @bart-ui/cli init [options]
+  npx @agent-ui/cli init [options]
 
 Options for init:
-  --dir <path>        Where to copy the bart-ui source (default: src/bart)
+  --dir <path>        Where to copy the agent-ui source (default: src/agent)
   --provider <name>   openai | anthropic | google | none — adds the matching
                       AI SDK adapter to your dependencies (default: prompt,
                       or none when non-interactive)
   -y, --yes           Accept defaults, never prompt
-  --force             Overwrite an existing .bart.json / non-empty --dir
+  --force             Overwrite an existing .agent.json / non-empty --dir
 
 Other commands (planned, not yet available): add, sync, doctor, update.
 `;
@@ -48,7 +48,7 @@ try {
     case "doctor":
     case "update":
       console.error(
-        `bart ${command} is planned but not available yet — only \`bart init\` ships today.`,
+        `agent ${command} is planned but not available yet — only \`agent init\` ships today.`,
       );
       process.exit(1);
       break;

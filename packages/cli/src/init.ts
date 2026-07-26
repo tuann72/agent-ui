@@ -1,6 +1,6 @@
 /**
- * `bart init` — copy the bundled templates into the consumer's repo, write
- * `.bart.json`, and add bart-ui's runtime dependencies to their package.json.
+ * `agent init` — copy the bundled templates into the consumer's repo, write
+ * `.agent.json`, and add agent-ui's runtime dependencies to their package.json.
  * All IO lives here; the decisions are in `lib.ts`.
  */
 
@@ -18,7 +18,7 @@ import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import {
-  buildBartConfig,
+  buildAgentConfig,
   CliError,
   detectPackageManager,
   installCommand,
@@ -74,33 +74,33 @@ export async function runInit(argv: string[], cliVersion: string): Promise<void>
   const { values } = parseArgs({
     args: argv,
     options: {
-      dir: { type: "string", default: "src/bart" },
+      dir: { type: "string", default: "src/agent" },
       provider: { type: "string" },
       yes: { type: "boolean", short: "y", default: false },
       force: { type: "boolean", default: false },
     },
   });
-  const dir = values.dir ?? "src/bart";
+  const dir = values.dir ?? "src/agent";
   const cwd = process.cwd();
 
-  const templatesDir = join(templatesRoot, "bart");
+  const templatesDir = join(templatesRoot, "agent");
   const manifestPath = join(templatesRoot, "manifest.json");
   if (!existsSync(templatesDir) || !existsSync(manifestPath)) {
     throw new CliError(
-      "Bundled templates are missing — this install of @bart-ui/cli is corrupted; reinstall it.",
+      "Bundled templates are missing — this install of @agent-ui/cli is corrupted; reinstall it.",
     );
   }
 
   const pkgPath = join(cwd, "package.json");
   if (!existsSync(pkgPath)) {
     throw new CliError(
-      "No package.json here — run `bart init` from your project root.",
+      "No package.json here — run `agent init` from your project root.",
     );
   }
-  const configPath = join(cwd, ".bart.json");
+  const configPath = join(cwd, ".agent.json");
   if (existsSync(configPath) && !values.force) {
     throw new CliError(
-      ".bart.json already exists — bart-ui is already initialized (use --force to re-scaffold).",
+      ".agent.json already exists — agent-ui is already initialized (use --force to re-scaffold).",
     );
   }
   const targetDir = resolve(cwd, dir);
@@ -129,7 +129,7 @@ export async function runInit(argv: string[], cliVersion: string): Promise<void>
     );
   }
 
-  // Copy templates and record install-time hashes for the future `bart update`.
+  // Copy templates and record install-time hashes for the future `agent update`.
   const hashes: Record<string, string> = {};
   for (const source of walkFiles(templatesDir)) {
     const rel = relative(templatesDir, source).split("\\").join("/");
@@ -142,7 +142,7 @@ export async function runInit(argv: string[], cliVersion: string): Promise<void>
 
   writeFileSync(
     configPath,
-    JSON.stringify(buildBartConfig(cliVersion, dir, provider, hashes), null, 2) +
+    JSON.stringify(buildAgentConfig(cliVersion, dir, provider, hashes), null, 2) +
       "\n",
   );
 
@@ -169,8 +169,8 @@ export async function runInit(argv: string[], cliVersion: string): Promise<void>
   );
   const pm = detectPackageManager(readdirSync(cwd));
 
-  console.log(`\nBart scaffolded into ${dir} (${fileCount} files).`);
-  console.log("Wrote .bart.json (paths, provider, install-time file hashes).");
+  console.log(`\nAgent scaffolded into ${dir} (${fileCount} files).`);
+  console.log("Wrote .agent.json (paths, provider, install-time file hashes).");
   const addedNames = Object.keys(merge.added);
   if (addedNames.length > 0) {
     console.log(`Added to package.json: ${addedNames.join(", ")}.`);
@@ -179,7 +179,7 @@ export async function runInit(argv: string[], cliVersion: string): Promise<void>
     console.log(`Already in your package.json (left untouched): ${merge.kept.join(", ")}.`);
   }
   if (!hasReact) {
-    console.log("\n⚠ No react dependency found — bart-ui requires React 19.");
+    console.log("\n⚠ No react dependency found — agent-ui requires React 19.");
   }
 
   console.log("\nNext steps:");
@@ -188,7 +188,7 @@ export async function runInit(argv: string[], cliVersion: string): Promise<void>
     `  2. Import the styles once (e.g. in your root layout): import "./${dir.replace(/\/+$/, "")}/styles.css"`,
   );
   console.log(
-    `  3. Render <BartChat …> from ${dir} and mount createBartHandler (from ${dir}/server) on your API route.`,
+    `  3. Render <AgentChat …> from ${dir} and mount createAgentHandler (from ${dir}/server) on your API route.`,
   );
   if (provider !== "none") {
     const info = PROVIDERS[provider];
@@ -199,13 +199,13 @@ export async function runInit(argv: string[], cliVersion: string): Promise<void>
       `     then wire the model: import { ${info.importName} } from "${info.pkg}" and pass`,
     );
     console.log(
-      `     model: ${info.importName}("${info.defaultModel}") to createBartHandler.`,
+      `     model: ${info.importName}("${info.defaultModel}") to createAgentHandler.`,
     );
   } else {
     console.log("");
     for (const line of noProviderHint(pm)) console.log(line);
   }
   console.log(
-    "\nDocs, manifest format, and server-mounting examples (Next.js, Vite): https://github.com/tuann72/bart-ui#readme\n",
+    "\nDocs, manifest format, and server-mounting examples (Next.js, Vite): https://github.com/tuann72/agent-ui#readme\n",
   );
 }

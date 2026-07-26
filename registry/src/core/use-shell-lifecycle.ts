@@ -6,6 +6,7 @@ import {
   useState,
   type AnimationEvent as ReactAnimationEvent,
   type RefObject,
+  type TransitionEvent as ReactTransitionEvent,
 } from "react";
 import { motionDisabled } from "./motion";
 
@@ -23,12 +24,14 @@ export interface UseShellLifecycleOptions {
 export interface ShellLifecycle {
   /** Keep the panel mounted: open, or still playing its exit animation. */
   showPanel: boolean;
-  /** True while the exit animation plays; drives the `bart-closing` class. */
+  /** True while the exit animation plays; drives the `agent-closing` class. */
   closing: boolean;
   /** User-initiated close: motion-aware, restores focus when done. */
   close: () => void;
   /** Attach to the animated panel root; unmounts it when the exit ends. */
   panelAnimationEnd: (event: ReactAnimationEvent<HTMLElement>) => void;
+  /** Transition-based shells use the same lifecycle completion contract. */
+  panelTransitionEnd: (event: ReactTransitionEvent<HTMLElement>) => void;
 }
 
 /**
@@ -37,7 +40,7 @@ export interface ShellLifecycle {
  * `open` reflects intent and flips false the moment a close begins; `closing`
  * keeps the panel mounted until its exit animation reports done. Because
  * intent and animation are separate, reopening while the exit plays (e.g. the
- * selection popover's "Ask Bart" mid-close) simply cancels the exit instead of
+ * selection popover's "Ask Agent" mid-close) simply cancels the exit instead of
  * losing the request — the render-time reset below runs before anything
  * unmounts. An external `open={false}` from the controlling component skips
  * the animation and unmounts immediately, as controlled components do.
@@ -77,6 +80,9 @@ export function useShellLifecycle({
   const panelAnimationEnd = (event: ReactAnimationEvent<HTMLElement>) => {
     if (closing && event.target === event.currentTarget) setClosing(false);
   };
+  const panelTransitionEnd = (event: ReactTransitionEvent<HTMLElement>) => {
+    if (closing && event.target === event.currentTarget) setClosing(false);
+  };
 
   // Escape closes from anywhere on the page while the panel is open.
   useEffect(() => {
@@ -96,5 +102,11 @@ export function useShellLifecycle({
     restoreFocusTo?.current?.focus();
   }, [showPanel]);
 
-  return { showPanel, closing, close, panelAnimationEnd };
+  return {
+    showPanel,
+    closing,
+    close,
+    panelAnimationEnd,
+    panelTransitionEnd,
+  };
 }

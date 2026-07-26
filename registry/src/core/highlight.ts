@@ -1,4 +1,4 @@
-import type { BartHighlightOptions, BartToolOutput } from "./types";
+import type { AgentHighlightOptions, AgentToolOutput } from "./types";
 
 interface ActiveHighlight {
   overlay: HTMLElement;
@@ -9,11 +9,11 @@ interface ActiveHighlight {
 let active: ActiveHighlight | null = null;
 
 function liveRegion(): HTMLElement {
-  let region = document.getElementById("bart-live-region");
+  let region = document.getElementById("agent-live-region");
   if (!region) {
     region = document.createElement("div");
-    region.id = "bart-live-region";
-    region.className = "bart-sr-only";
+    region.id = "agent-live-region";
+    region.className = "agent-sr-only";
     region.setAttribute("role", "status");
     region.setAttribute("aria-live", "polite");
     document.body.appendChild(region);
@@ -31,16 +31,16 @@ export function dismissHighlight(): void {
 
 /**
  * Highlight an opted-in page element. The target id must already be validated
- * against the manifest; this only locates `data-bart-target` elements and
+ * against the manifest; this only locates `data-agent-target` elements and
  * never accepts arbitrary selectors. The overlay is absolutely positioned so
  * it causes no layout shift, and it cleans itself up after `durationMs`.
  */
 export function runHighlight(
   targetId: string,
-  options?: BartHighlightOptions & { label?: string },
-): BartToolOutput {
+  options?: AgentHighlightOptions & { label?: string },
+): AgentToolOutput {
   const element = document.querySelector(
-    `[data-bart-target="${CSS.escape(targetId)}"]`,
+    `[data-agent-target="${CSS.escape(targetId)}"]`,
   );
   if (!(element instanceof Element)) {
     return { ok: false, reason: "target-not-found" };
@@ -58,26 +58,26 @@ export function runHighlight(
 
   const pad = Math.min(Math.max(options?.padding ?? 6, 0), 64);
   const overlay = document.createElement("div");
-  overlay.className = "bart-highlight-overlay";
+  overlay.className = "agent-highlight-overlay";
   overlay.setAttribute("aria-hidden", "true");
   if (options?.borderColor) {
-    overlay.style.setProperty("--bart-highlight-border-color", options.borderColor);
+    overlay.style.setProperty("--agent-highlight-border-color", options.borderColor);
   }
   if (options?.backgroundColor) {
-    overlay.style.setProperty("--bart-highlight-fill", options.backgroundColor);
+    overlay.style.setProperty("--agent-highlight-fill", options.backgroundColor);
   }
   if (options?.ringColor) {
-    overlay.style.setProperty("--bart-highlight-ring-color", options.ringColor);
+    overlay.style.setProperty("--agent-highlight-ring-color", options.ringColor);
   }
   if (options?.borderRadius) {
-    overlay.style.setProperty("--bart-highlight-radius", options.borderRadius);
+    overlay.style.setProperty("--agent-highlight-radius", options.borderRadius);
   }
   if (options?.borderStyle) {
-    overlay.style.setProperty("--bart-highlight-border-style", options.borderStyle);
+    overlay.style.setProperty("--agent-highlight-border-style", options.borderStyle);
   }
   if (options?.borderWidth !== undefined) {
     const width = Math.min(Math.max(options.borderWidth, 0), 16);
-    overlay.style.setProperty("--bart-highlight-border-width", `${width}px`);
+    overlay.style.setProperty("--agent-highlight-border-width", `${width}px`);
   }
 
   let frame = 0;

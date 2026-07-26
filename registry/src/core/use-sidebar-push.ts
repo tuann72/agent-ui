@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
-import type { BartSide } from "./resize";
+import type { AgentSide } from "./resize";
 
-const PUSH_CLASS = "bart-sidebar-push";
+const PUSH_CLASS = "agent-sidebar-push";
 
-// Bart owns exactly these globals: the push classes on <body> and the width
+// Agent owns exactly these globals: the push classes on <body> and the width
 // variable on <html>. Instance-counted so a second mounted sidebar (however
 // ill-advised) cannot strip them out from under the first on unmount.
 let instances = 0;
@@ -25,7 +25,7 @@ export function useSidebarPush({
   width,
 }: {
   open: boolean;
-  side: BartSide;
+  side: AgentSide;
   width: number | null;
 }): void {
   useEffect(() => {
@@ -35,7 +35,7 @@ export function useSidebarPush({
       instances -= 1;
       if (instances === 0) {
         document.body.classList.remove(PUSH_CLASS);
-        document.documentElement.style.removeProperty("--bart-sidebar-width");
+        document.documentElement.style.removeProperty("--agent-sidebar-width");
       }
     };
   }, []);
@@ -43,7 +43,7 @@ export function useSidebarPush({
   useEffect(() => {
     if (width === null) return;
     document.documentElement.style.setProperty(
-      "--bart-sidebar-width",
+      "--agent-sidebar-width",
       `${width}px`,
     );
   }, [width]);
@@ -51,7 +51,7 @@ export function useSidebarPush({
   useEffect(() => {
     if (!open) return;
     const cls =
-      side === "left" ? "bart-sidebar-push-left" : "bart-sidebar-push-right";
+      side === "left" ? "agent-sidebar-push-left" : "agent-sidebar-push-right";
     document.body.classList.add(cls);
     return () => document.body.classList.remove(cls);
   }, [open, side]);

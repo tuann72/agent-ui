@@ -7,7 +7,7 @@
  * it *produces* stays uncommitted — the adapter is installed locally (and the
  * touched manifests are immediately restored), and the generated server file
  * matches the gitignored `*.local.ts` pattern. This mirrors what the future
- * `@bart-ui/cli` will do for a consumer, without violating invariant 12
+ * `@agent-ui/cli` will do for a consumer, without violating invariant 12
  * (no provider adapter in the committed dependency tree; smoke-test setup
  * stays uncommitted).
  *
@@ -73,8 +73,8 @@ const PROVIDERS: Record<string, ProviderConfig> = {
 };
 
 const SYSTEM_PROMPT =
-  "You are the friendly customer guide for Stackhouse Burger Co., a fictional " +
-  "neighborhood burger restaurant. Answer immediately and concisely. Use no " +
+  "You are the front-desk guide for Basalt Bouldering Co., a fictional " +
+  "climbing gym in Bend, Oregon. Answer immediately and concisely. Use no " +
   "more than three short sentences unless the user explicitly requests detail. " +
   "Do not restate the question, narrate your reasoning, or add unnecessary " +
   "background.";
@@ -185,12 +185,12 @@ function generateServerFile(): string {
 // environment (the launcher normalizes any accepted alias into it), so no key
 // is hardcoded or passed through the browser.
 import { ${config.factory} } from "${config.pkg}";
-import { createBartHandler } from "@bart-ui/registry/server";
+import { createAgentHandler } from "@agent-ui/registry/server";
 import { serverManifest } from "./manifest";
 
 const provider = ${config.factory}();
 
-export const handler = createBartHandler({
+export const handler = createAgentHandler({
   model: provider(${JSON.stringify(model)}),
   manifest: serverManifest,
   system:
@@ -217,7 +217,7 @@ console.log(`• Wrote ${config.file} (uncommitted)`);
 const childEnv = {
   ...process.env,
   [config.canonicalEnv]: apiKey,
-  BART_PLAYGROUND_API_MODULE: `/server/${config.file}`,
+  AGENT_PLAYGROUND_API_MODULE: `/server/${config.file}`,
 };
 
 console.log(

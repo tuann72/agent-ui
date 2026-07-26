@@ -1,15 +1,15 @@
 /*
  * Optional Tailwind v4 bridge. Import this file only when your app uses
- * Tailwind v4: it re-exports Bart's tokens (defined in styles.css) into
- * Tailwind's --color-* namespace so utilities like `bg-bart-primary` work.
+ * Tailwind v4: it re-exports Agent's tokens (defined in styles.css) into
+ * Tailwind's --color-* namespace so utilities like `bg-agent-primary` work.
  * styles.css itself is plain CSS and needs no Tailwind.
  */
 @theme inline {
-  --color-bart-primary: var(--bart-primary);
-  --color-bart-primary-foreground: var(--bart-primary-foreground);
-  --color-bart-accent: var(--bart-accent);
-  --color-bart-accent-foreground: var(--bart-accent-foreground);
-  --color-bart-surface: var(--bart-surface);
-  --color-bart-surface-foreground: var(--bart-surface-foreground);
-  --color-bart-border: var(--bart-border);
+  --color-agent-primary: var(--agent-primary);
+  --color-agent-primary-foreground: var(--agent-primary-foreground);
+  --color-agent-accent: var(--agent-accent);
+  --color-agent-accent-foreground: var(--agent-accent-foreground);
+  --color-agent-surface: var(--agent-surface);
+  --color-agent-surface-foreground: var(--agent-surface-foreground);
+  --color-agent-border: var(--agent-border);
 }

@@ -1,63 +1,64 @@
 /*
- * Bart theming tokens. Consumers own this file: swap the primary/accent
+ * Agent theming tokens. Consumers own this file: swap the primary/accent
  * values to match the site's brand. When a shadcn theme exists, point these
  * at var(--primary) / var(--accent) instead.
  */
 :root {
-  --bart-primary: oklch(0.55 0.2 262);
-  --bart-primary-foreground: oklch(0.985 0.005 262);
-  --bart-accent: oklch(0.72 0.14 190);
-  --bart-accent-foreground: oklch(0.2 0.03 190);
-  --bart-surface: oklch(1 0 0);
-  --bart-surface-foreground: oklch(0.21 0.01 262);
-  --bart-muted-foreground: oklch(0.55 0.01 262);
-  --bart-border: oklch(0.91 0.005 262);
-  --bart-glass: oklch(1 0 0 / 0.4);
-  --bart-glass-sheen: oklch(1 0 0 / 0.35);
-  --bart-danger: oklch(0.5 0.2 25);
-  --bart-danger-border: oklch(0.6 0.2 25);
-  --bart-radius: 0.75rem;
-  --bart-highlight-border-color: var(--bart-accent);
-  --bart-highlight-border-width: 2px;
-  --bart-highlight-border-style: solid;
-  --bart-highlight-fill: color-mix(in oklch, var(--bart-accent) 8%, transparent);
-  --bart-highlight-ring-color: color-mix(in oklch, var(--bart-accent) 35%, transparent);
-  --bart-highlight-radius: var(--bart-radius);
+  --agent-primary: oklch(0.55 0.2 262);
+  --agent-primary-foreground: oklch(0.985 0.005 262);
+  --agent-accent: oklch(0.72 0.14 190);
+  --agent-accent-foreground: oklch(0.2 0.03 190);
+  --agent-surface: oklch(1 0 0);
+  --agent-surface-foreground: oklch(0.21 0.01 262);
+  --agent-muted-foreground: oklch(0.55 0.01 262);
+  --agent-border: oklch(0.91 0.005 262);
+  --agent-glass: oklch(1 0 0 / 0.4);
+  --agent-glass-sheen: oklch(1 0 0 / 0.35);
+  --agent-danger: oklch(0.5 0.2 25);
+  --agent-danger-border: oklch(0.6 0.2 25);
+  --agent-radius: 0.75rem;
+  --agent-highlight-border-color: var(--agent-accent);
+  --agent-highlight-border-width: 2px;
+  --agent-highlight-border-style: solid;
+  --agent-highlight-fill: color-mix(in oklch, var(--agent-accent) 8%, transparent);
+  --agent-highlight-ring-color: color-mix(in oklch, var(--agent-accent) 35%, transparent);
+  --agent-highlight-radius: var(--agent-radius);
 }
 
 .dark {
-  --bart-primary: oklch(0.68 0.17 262);
-  --bart-primary-foreground: oklch(0.16 0.02 262);
-  --bart-accent: oklch(0.78 0.12 190);
-  --bart-accent-foreground: oklch(0.18 0.03 190);
-  --bart-surface: oklch(0.21 0.01 262);
-  --bart-surface-foreground: oklch(0.93 0.005 262);
-  --bart-muted-foreground: oklch(0.68 0.01 262);
-  --bart-border: oklch(0.32 0.01 262);
-  --bart-glass: oklch(0.22 0.015 262 / 0.5);
-  --bart-glass-sheen: oklch(1 0 0 / 0.08);
+  --agent-primary: oklch(0.68 0.17 262);
+  --agent-primary-foreground: oklch(0.16 0.02 262);
+  --agent-accent: oklch(0.78 0.12 190);
+  --agent-accent-foreground: oklch(0.18 0.03 190);
+  --agent-surface: oklch(0.21 0.01 262);
+  --agent-surface-foreground: oklch(0.93 0.005 262);
+  --agent-muted-foreground: oklch(0.68 0.01 262);
+  --agent-border: oklch(0.32 0.01 262);
+  --agent-glass: oklch(0.22 0.015 262 / 0.5);
+  --agent-glass-sheen: oklch(1 0 0 / 0.08);
   /* Near-white: the light-mode red is a dark ink that all but disappears
      against a dark panel, and every variant's panel is dark glass here. */
-  --bart-danger: oklch(0.88 0.06 25);
-  --bart-danger-border: oklch(0.65 0.15 25);
+  --agent-danger: oklch(0.88 0.06 25);
+  --agent-danger-border: oklch(0.65 0.15 25);
 }
 
 /* ---------- shared primitives ---------- */
 
 /*
- * Bart floats above the host page, so host typography rules must not leak in:
+ * Agent floats above the host page, so host typography rules must not leak in:
  * the default Vite starter, for one, sets `text-align: center` on #root, which
  * would center every message and make short blockquote lines look indented.
  */
-.bart-dock-tab,
-.bart-dock-panel,
-.bart-sidebar-panel,
-.bart-spotlight-root,
-.bart-selection-popover {
+.agent-dock-tab,
+.agent-dock-frame,
+.agent-dock-panel,
+.agent-sidebar-panel,
+.agent-spotlight-root,
+.agent-selection-popover {
   text-align: start;
 }
 
-.bart-sr-only {
+.agent-sr-only {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -69,28 +70,28 @@
   border: 0;
 }
 
-.bart-muted {
-  color: var(--bart-muted-foreground);
+.agent-muted {
+  color: var(--agent-muted-foreground);
   font-size: 0.8125rem;
 }
 
-.bart-kbd {
+.agent-kbd {
   display: inline-block;
   padding: 0.05rem 0.4rem;
-  border: 1px solid var(--bart-border);
+  border: 1px solid var(--agent-border);
   border-bottom-width: 2px;
   border-radius: 0.375rem;
   font-family: ui-monospace, monospace;
   font-size: 0.75rem;
-  background: var(--bart-surface);
-  color: var(--bart-surface-foreground);
+  background: var(--agent-surface);
+  color: var(--agent-surface-foreground);
 }
 
-.bart-btn-primary {
-  background: var(--bart-primary);
-  color: var(--bart-primary-foreground);
+.agent-btn-primary {
+  background: var(--agent-primary);
+  color: var(--agent-primary-foreground);
   border: none;
-  border-radius: calc(var(--bart-radius) - 0.25rem);
+  border-radius: calc(var(--agent-radius) - 0.25rem);
   padding: 0.375rem 0.875rem;
   font-size: 0.8125rem;
   font-weight: 600;
@@ -99,38 +100,39 @@
   align-items: center;
   gap: 0.375rem;
 }
-.bart-btn-primary:hover { filter: brightness(1.08); }
-.bart-btn-primary:disabled { opacity: 0.5; cursor: default; }
+.agent-btn-primary:hover { filter: brightness(1.08); }
+.agent-btn-primary:disabled { opacity: 0.5; cursor: default; }
 
-.bart-btn-ghost {
+.agent-btn-ghost {
   background: transparent;
-  color: var(--bart-surface-foreground);
-  border: 1px solid var(--bart-border);
-  border-radius: calc(var(--bart-radius) - 0.25rem);
+  color: var(--agent-surface-foreground);
+  border: 1px solid var(--agent-border);
+  border-radius: calc(var(--agent-radius) - 0.25rem);
   padding: 0.375rem 0.875rem;
   font-size: 0.8125rem;
   cursor: pointer;
 }
-.bart-btn-ghost:hover { border-color: var(--bart-accent); color: inherit; }
+.agent-btn-ghost:hover { border-color: var(--agent-accent); color: inherit; }
+.agent-btn-ghost:disabled { opacity: 0.5; cursor: default; }
 
-.bart-icon-btn {
+.agent-icon-btn {
   background: transparent;
   border: none;
-  color: var(--bart-primary-foreground);
+  color: var(--agent-primary-foreground);
   font-size: 0.875rem;
   cursor: pointer;
   padding: 0.25rem 0.5rem;
   border-radius: 0.375rem;
 }
-.bart-icon-btn:hover { background: oklch(1 0 0 / 0.15); }
+.agent-icon-btn:hover { background: oklch(1 0 0 / 0.15); }
 
 /* The auto-approve control is a switch: a pill track whose thumb slides
    across and recolours when on. Track/thumb colors ride on currentColor so
    the same control works on the primary-tinted header and on glass; the
    header inverts the on-state locals so "on" still contrasts with primary. */
-.bart-switch {
-  --bart-switch-on-track: var(--bart-primary);
-  --bart-switch-on-thumb: var(--bart-primary-foreground);
+.agent-switch {
+  --agent-switch-on-track: var(--agent-primary);
+  --agent-switch-on-thumb: var(--agent-primary-foreground);
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
@@ -142,12 +144,12 @@
   border-radius: 0.375rem;
   cursor: pointer;
 }
-.bart-switch:hover { background: oklch(1 0 0 / 0.15); }
-.bart-panel-actions .bart-switch {
-  --bart-switch-on-track: var(--bart-primary-foreground);
-  --bart-switch-on-thumb: var(--bart-primary);
+.agent-switch:hover { background: oklch(1 0 0 / 0.15); }
+.agent-panel-actions .agent-switch {
+  --agent-switch-on-track: var(--agent-primary-foreground);
+  --agent-switch-on-thumb: var(--agent-primary);
 }
-.bart-switch-track {
+.agent-switch-track {
   position: relative;
   width: 1.75rem;
   height: 1rem;
@@ -156,7 +158,7 @@
   background: color-mix(in oklch, currentColor 30%, transparent);
   transition: background 150ms ease;
 }
-.bart-switch-thumb {
+.agent-switch-thumb {
   position: absolute;
   top: 0.125rem;
   left: 0.125rem;
@@ -166,54 +168,104 @@
   background: currentColor;
   transition: translate 150ms ease, background 150ms ease;
 }
-.bart-switch[aria-checked="true"] .bart-switch-track {
-  background: var(--bart-switch-on-track);
+.agent-switch[aria-checked="true"] .agent-switch-track {
+  background: var(--agent-switch-on-track);
 }
-.bart-switch[aria-checked="true"] .bart-switch-thumb {
+.agent-switch[aria-checked="true"] .agent-switch-thumb {
   translate: 0.75rem 0;
-  background: var(--bart-switch-on-thumb);
+  background: var(--agent-switch-on-thumb);
 }
 
-/* Every interactive Bart element gets a pointer cursor, regardless of the
+/* Every interactive Agent element gets a pointer cursor, regardless of the
    host app's CSS reset. Resize handles are exempt: they are drag affordances
    with their own directional cursors, and this selector's specificity (0,2,1)
    would otherwise outrank a handle's own single-class rule (0,1,0) and force a
-   pointer onto it. Any new handle must carry .bart-resize-handle to opt out. */
-[data-bart-ui] button:not(:disabled):not(.bart-resize-handle) {
+   pointer onto it. Any new handle must carry .agent-resize-handle to opt out. */
+[data-agent-ui] button:not(:disabled):not(.agent-resize-handle) {
   cursor: pointer;
 }
 
 /* ---------- selection popover ---------- */
 
-/* The resting transform lifts the popup above the selection; the entrance and
-   exit keyframes must carry that translate, so they restate it in full. */
-.bart-selection-popover {
+/* The element is placed at the anchor point of the chosen side; the resting
+   transform pulls it off that point (centering it and opening the gap), and
+   `--agent-popover-from-*` is the small extra offset the entrance slides in
+   from. The keyframes must carry the resting translate, so they restate it
+   through the same variables rather than hardcoding one side's values. */
+.agent-selection-popover {
   position: fixed;
   z-index: 70;
-  transform: translate(-50%, calc(-100% - 0.5rem));
-  animation: bart-popover-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  --agent-popover-x: -50%;
+  --agent-popover-y: calc(-100% - 0.5rem);
+  --agent-popover-from-x: 0px;
+  --agent-popover-from-y: 0.375rem;
+  transform: translate(var(--agent-popover-x), var(--agent-popover-y));
+  animation: agent-popover-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.agent-selection-popover[data-side="bottom"] {
+  --agent-popover-y: 0.5rem;
+  --agent-popover-from-y: -0.375rem;
+}
+
+.agent-selection-popover[data-side="left"] {
+  --agent-popover-x: calc(-100% - 0.5rem);
+  --agent-popover-y: -50%;
+  --agent-popover-from-x: 0.375rem;
+  --agent-popover-from-y: 0px;
+}
+
+.agent-selection-popover[data-side="right"] {
+  --agent-popover-x: 0.5rem;
+  --agent-popover-y: -50%;
+  --agent-popover-from-x: -0.375rem;
+  --agent-popover-from-y: 0px;
 }
 
 /* Held mounted until animationend so this can play out. */
-.bart-selection-popover[data-state="closed"] {
+.agent-selection-popover[data-state="closed"] {
   pointer-events: none;
-  animation: bart-popover-out 0.12s ease-in forwards;
+  animation: agent-popover-out 0.12s ease-in forwards;
 }
 
-.bart-selection-popover .bart-btn-primary {
+.agent-selection-actions {
+  display: inline-flex;
   box-shadow: 0 6px 24px oklch(0 0 0 / 0.25);
+  border-radius: calc(var(--agent-radius) - 0.25rem);
+}
+
+.agent-selection-popover .agent-btn-primary {
   white-space: nowrap;
+}
+.agent-selection-ask {
+  border-radius:
+    calc(var(--agent-radius) - 0.25rem) 0 0
+    calc(var(--agent-radius) - 0.25rem);
+}
+.agent-selection-add {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  justify-content: center;
+  padding: 0.375rem 0.625rem;
+  border-left: 1px solid color-mix(
+    in oklch,
+    var(--agent-primary-foreground) 35%,
+    transparent
+  );
+  border-radius:
+    0 calc(var(--agent-radius) - 0.25rem)
+    calc(var(--agent-radius) - 0.25rem) 0;
 }
 
 /* ---------- selected-text pills ---------- */
 
-.bart-input-area {
+.agent-input-area {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
 }
 
-.bart-quote-list {
+.agent-quote-list {
   display: flex;
   flex-wrap: wrap;
   gap: 0.375rem;
@@ -224,20 +276,20 @@
   padding: 0.625rem 0.75rem;
 }
 
-.bart-quote-chip {
+.agent-quote-chip {
   display: flex;
   align-items: center;
   gap: 0.25rem;
   max-width: 100%;
   padding: 0.25rem 0.25rem 0.25rem 0.625rem;
-  border: 1px solid color-mix(in oklch, var(--bart-accent) 45%, var(--bart-border));
+  border: 1px solid color-mix(in oklch, var(--agent-accent) 45%, var(--agent-border));
   border-radius: 999px;
-  background: color-mix(in oklch, var(--bart-accent) 10%, var(--bart-surface));
+  background: color-mix(in oklch, var(--agent-accent) 10%, var(--agent-surface));
   font-size: 0.8125rem;
-  color: var(--bart-muted-foreground);
+  color: var(--agent-muted-foreground);
 }
 
-.bart-quote-chip-text {
+.agent-quote-chip-text {
   min-width: 0;
   max-width: 17rem;
   white-space: nowrap;
@@ -246,29 +298,29 @@
   font-style: italic;
 }
 
-.bart-quote-chip-dismiss {
-  color: var(--bart-muted-foreground);
+.agent-quote-chip-dismiss {
+  color: var(--agent-muted-foreground);
   flex-shrink: 0;
 }
-.bart-quote-chip-dismiss:hover {
-  background: color-mix(in oklch, var(--bart-accent) 20%, transparent);
+.agent-quote-chip-dismiss:hover {
+  background: color-mix(in oklch, var(--agent-accent) 20%, transparent);
 }
 
 /* ---------- panel chrome ---------- */
 
-.bart-panel-header {
+.agent-panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0.625rem 0.875rem;
   /* Translucent so the panel's glass blur still reads through the header. */
-  background: color-mix(in oklch, var(--bart-primary) 80%, transparent);
-  color: var(--bart-primary-foreground);
-  border-radius: var(--bart-radius) var(--bart-radius) 0 0;
+  background: color-mix(in oklch, var(--agent-primary) 80%, transparent);
+  color: var(--agent-primary-foreground);
+  border-radius: var(--agent-radius) var(--agent-radius) 0 0;
   flex-shrink: 0;
 }
 
-.bart-panel-title {
+.agent-panel-title {
   font-weight: 600;
   font-size: 0.875rem;
   display: flex;
@@ -276,25 +328,25 @@
   gap: 0.375rem;
 }
 
-.bart-panel-actions {
+.agent-panel-actions {
   display: flex;
   align-items: center;
   gap: 0.125rem;
 }
-.bart-panel-actions .bart-icon-btn {
+.agent-panel-actions .agent-icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
-.bart-panel-body {
+.agent-panel-body {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
 }
 
-.bart-message-list {
+.agent-message-list {
   flex: 1;
   overflow-y: auto;
   padding: 0.875rem;
@@ -302,31 +354,31 @@
   flex-direction: column;
   gap: 0.625rem;
   font-size: 0.875rem;
-  color: var(--bart-surface-foreground);
+  color: var(--agent-surface-foreground);
 }
 
-.bart-empty-hint { margin: auto; text-align: center; max-width: 18rem; }
-.bart-empty-hint p { margin: 0; }
-.bart-starter-prompts {
+.agent-empty-hint { margin: auto; text-align: center; max-width: 18rem; }
+.agent-empty-hint p { margin: 0; }
+.agent-starter-prompts {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 0.375rem;
   margin-top: 0.75rem;
 }
-.bart-starter-prompts .bart-btn-ghost { font-size: 0.75rem; }
+.agent-starter-prompts .agent-btn-ghost { font-size: 0.75rem; }
 
-.bart-msg-user {
+.agent-msg-user {
   align-self: flex-end;
   max-width: 85%;
-  background: var(--bart-primary);
-  color: var(--bart-primary-foreground);
-  border-radius: var(--bart-radius);
+  background: var(--agent-primary);
+  color: var(--agent-primary-foreground);
+  border-radius: var(--agent-radius);
   border-bottom-right-radius: 0.25rem;
   padding: 0.5rem 0.75rem;
 }
 
-.bart-msg-assistant {
+.agent-msg-assistant {
   align-self: flex-start;
   max-width: 95%;
   display: flex;
@@ -336,150 +388,201 @@
 
 /* ---------- message Markdown ---------- */
 
-.bart-markdown {
+.agent-markdown {
   min-width: 0;
   overflow-wrap: anywhere;
 }
-.bart-markdown > :first-child { margin-top: 0; }
-.bart-markdown > :last-child { margin-bottom: 0; }
-.bart-markdown p { margin: 0 0 0.55rem; }
-.bart-markdown h1,
-.bart-markdown h2,
-.bart-markdown h3,
-.bart-markdown h4 {
+.agent-markdown > :first-child { margin-top: 0; }
+.agent-markdown > :last-child { margin-bottom: 0; }
+.agent-markdown p { margin: 0 0 0.55rem; }
+.agent-markdown h1,
+.agent-markdown h2,
+.agent-markdown h3,
+.agent-markdown h4 {
   margin: 0.8rem 0 0.35rem;
   line-height: 1.25;
   font-weight: 650;
 }
-.bart-markdown h1 { font-size: 1.2rem; }
-.bart-markdown h2 { font-size: 1.1rem; }
-.bart-markdown h3,
-.bart-markdown h4 { font-size: 1rem; }
-.bart-markdown ul,
-.bart-markdown ol {
+.agent-markdown h1 { font-size: 1.2rem; }
+.agent-markdown h2 { font-size: 1.1rem; }
+.agent-markdown h3,
+.agent-markdown h4 { font-size: 1rem; }
+.agent-markdown ul,
+.agent-markdown ol {
   margin: 0.4rem 0 0.65rem;
   padding-left: 1.35rem;
 }
-.bart-markdown li + li { margin-top: 0.2rem; }
-.bart-markdown blockquote {
+.agent-markdown li + li { margin-top: 0.2rem; }
+.agent-markdown blockquote {
   margin: 0.4rem 0 0.65rem;
   padding-left: 0.7rem;
   border-left: 3px solid currentColor;
   opacity: 0.82;
 }
-.bart-markdown code {
+.agent-markdown code {
   border-radius: 0.3rem;
   background: color-mix(in oklch, currentColor 10%, transparent);
   padding: 0.08rem 0.3rem;
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   font-size: 0.85em;
 }
-.bart-markdown pre {
+.agent-markdown pre {
   max-width: 100%;
   margin: 0.5rem 0 0.7rem;
   overflow-x: auto;
   border: 1px solid color-mix(in oklch, currentColor 18%, transparent);
-  border-radius: calc(var(--bart-radius) - 0.2rem);
+  border-radius: calc(var(--agent-radius) - 0.2rem);
   background: color-mix(in oklch, currentColor 7%, transparent);
   padding: 0.65rem 0.75rem;
 }
-.bart-markdown pre code { background: transparent; padding: 0; }
-.bart-markdown table {
+.agent-markdown pre code { background: transparent; padding: 0; }
+.agent-markdown table {
   display: block;
   max-width: 100%;
   margin: 0.5rem 0 0.7rem;
   overflow-x: auto;
   border-collapse: collapse;
 }
-.bart-markdown th,
-.bart-markdown td {
+.agent-markdown th,
+.agent-markdown td {
   border: 1px solid color-mix(in oklch, currentColor 20%, transparent);
   padding: 0.35rem 0.5rem;
   text-align: left;
   white-space: nowrap;
 }
-.bart-markdown th { font-weight: 650; }
-.bart-markdown a {
+.agent-markdown th { font-weight: 650; }
+.agent-markdown a {
   color: inherit;
   text-decoration: underline;
   text-underline-offset: 0.15em;
 }
-.bart-markdown hr {
+.agent-markdown hr {
   margin: 0.75rem 0;
   border: 0;
   border-top: 1px solid color-mix(in oklch, currentColor 22%, transparent);
 }
 
-.bart-tool-row {
+.agent-tool-row {
   font-size: 0.8125rem;
-  color: var(--bart-muted-foreground);
+  color: var(--agent-muted-foreground);
   display: flex;
   gap: 0.375rem;
   align-items: baseline;
 }
 
-.bart-tool-card {
-  border: 1px solid var(--bart-accent);
-  border-radius: var(--bart-radius);
-  padding: 0.625rem 0.75rem;
-  background: color-mix(in oklch, var(--bart-accent) 12%, var(--bart-surface));
+.agent-action-group {
+  overflow: hidden;
+  border: 1px solid var(--agent-border);
+  border-radius: var(--agent-radius);
+  background: color-mix(
+    in oklch,
+    var(--agent-accent) 6%,
+    var(--agent-surface)
+  );
 }
 
-.bart-tool-question { margin: 0 0 0.5rem; font-size: 0.8125rem; }
-.bart-tool-actions { display: flex; gap: 0.5rem; }
+.agent-action-group-heading {
+  padding: 0.45rem 0.65rem;
+  border-bottom: 1px solid var(--agent-border);
+  color: var(--agent-surface-foreground);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
 
-.bart-typing {
+.agent-action-group-list,
+.agent-replay-results {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.625rem 0.65rem;
+}
+
+.agent-replay-results {
+  border-top: 1px solid var(--agent-border);
+  background: color-mix(
+    in oklch,
+    var(--agent-primary) 4%,
+    transparent
+  );
+}
+
+.agent-action-group-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.5rem 0.65rem;
+  border-top: 1px solid var(--agent-border);
+}
+
+.agent-replay-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.75rem;
+}
+
+.agent-tool-card {
+  border: 1px solid var(--agent-accent);
+  border-radius: var(--agent-radius);
+  padding: 0.625rem 0.75rem;
+  background: color-mix(in oklch, var(--agent-accent) 12%, var(--agent-surface));
+}
+
+.agent-tool-question { margin: 0 0 0.5rem; font-size: 0.8125rem; }
+.agent-tool-actions { display: flex; gap: 0.5rem; }
+
+.agent-typing {
   display: flex;
   align-items: baseline;
   gap: 0.4rem;
   padding: 0.25rem 0;
-  color: var(--bart-muted-foreground);
+  color: var(--agent-muted-foreground);
   font-size: 0.8125rem;
 }
-.bart-typing-label { min-width: 4.5rem; }
-.bart-typing-dots { display: inline-flex; gap: 0.25rem; }
-.bart-typing-dots > span {
+.agent-typing-label { min-width: 4.5rem; }
+.agent-typing-dots { display: inline-flex; gap: 0.25rem; }
+.agent-typing-dots > span {
   width: 0.4rem;
   height: 0.4rem;
   border-radius: 50%;
-  background: var(--bart-muted-foreground);
-  animation: bart-pulse 1.2s ease-in-out infinite;
+  background: var(--agent-muted-foreground);
+  animation: agent-pulse 1.2s ease-in-out infinite;
 }
-.bart-typing-dots > span:nth-child(2) { animation-delay: 0.15s; }
-.bart-typing-dots > span:nth-child(3) { animation-delay: 0.3s; }
+.agent-typing-dots > span:nth-child(2) { animation-delay: 0.15s; }
+.agent-typing-dots > span:nth-child(3) { animation-delay: 0.3s; }
 
-.bart-error {
-  border: 1px solid var(--bart-danger-border);
-  color: var(--bart-danger);
-  border-radius: var(--bart-radius);
+.agent-error {
+  border: 1px solid var(--agent-danger-border);
+  color: var(--agent-danger);
+  border-radius: var(--agent-radius);
   padding: 0.5rem 0.75rem;
   font-size: 0.8125rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
-.bart-error p { margin: 0; }
+.agent-error p { margin: 0; }
 
-.bart-input-row {
+.agent-input-row {
   display: flex;
   padding: 0.75rem;
-  border-top: 1px solid var(--bart-border);
+  border-top: 1px solid var(--agent-border);
   flex-shrink: 0;
 }
 
 /* Combined field: the input and the round send/stop button share one shell. */
-.bart-input-shell {
+.agent-input-shell {
   flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
-  border: 1px solid var(--bart-border);
+  border: 1px solid var(--agent-border);
   border-radius: 999px;
-  background: var(--bart-surface);
+  background: var(--agent-surface);
   padding: 0.2rem 0.25rem 0.2rem 0.375rem;
 }
-.bart-input-shell:focus-within {
-  outline: 2px solid var(--bart-primary);
+.agent-input-shell:focus-within {
+  outline: 2px solid var(--agent-primary);
   outline-offset: 1px;
   border-color: transparent;
 }
@@ -490,13 +593,13 @@
  * separation it needs, and the shell stays transparent so the panel glass reads
  * through. Spotlight opts out — it keeps its own centered card treatment.
  */
-.bart-dock-panel .bart-input-row,
-.bart-sidebar-panel .bart-input-row {
+.agent-dock-panel .agent-input-row,
+.agent-sidebar-panel .agent-input-row {
   padding: 0;
   border-top-width: 2px;
 }
-.bart-dock-panel .bart-input-shell,
-.bart-sidebar-panel .bart-input-shell {
+.agent-dock-panel .agent-input-shell,
+.agent-sidebar-panel .agent-input-shell {
   border: none;
   border-radius: 0;
   background: transparent;
@@ -507,60 +610,60 @@
  * full bleed a ring would draw a heavy accent rectangle across the foot of the
  * panel. The edge is always 2px, so recolouring it shifts nothing.
  */
-.bart-dock-panel .bart-input-shell:focus-within,
-.bart-sidebar-panel .bart-input-shell:focus-within {
+.agent-dock-panel .agent-input-shell:focus-within,
+.agent-sidebar-panel .agent-input-shell:focus-within {
   outline: none;
 }
-.bart-dock-panel .bart-input-row:focus-within,
-.bart-sidebar-panel .bart-input-row:focus-within {
-  border-top-color: var(--bart-primary);
+.agent-dock-panel .agent-input-row:focus-within,
+.agent-sidebar-panel .agent-input-row:focus-within {
+  border-top-color: var(--agent-primary);
 }
 
 /* Opt-out (inputSeparator={false}): the row keeps its height so nothing
    shifts, but draws no line — idle or focused. Placed after the focus rules
    above so the specificity tie resolves to "no line". */
-.bart-dock-panel.bart-no-separator .bart-input-row,
-.bart-sidebar-panel.bart-no-separator .bart-input-row {
+.agent-dock-panel.agent-no-separator .agent-input-row,
+.agent-sidebar-panel.agent-no-separator .agent-input-row {
   border-top-color: transparent;
 }
 
-.bart-input {
+.agent-input {
   flex: 1;
   min-width: 0;
   border: none;
   background: transparent;
   padding: 0.3rem 0.5rem;
   font-size: 0.875rem;
-  color: var(--bart-surface-foreground);
+  color: var(--agent-surface-foreground);
 }
-.bart-input:focus {
+.agent-input:focus {
   outline: none;
 }
 
 /* Reads as part of the field rather than a separate call to action: no accent
    fill, just a muted glyph that firms up on hover. */
-.bart-send-btn {
+.agent-send-btn {
   width: 1.9rem;
   height: 1.9rem;
   flex-shrink: 0;
   border: none;
   border-radius: 0.5rem;
   background: transparent;
-  color: var(--bart-muted-foreground);
+  color: var(--agent-muted-foreground);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
 }
-.bart-send-btn:hover {
-  background: color-mix(in oklch, var(--bart-surface-foreground) 10%, transparent);
-  color: var(--bart-surface-foreground);
+.agent-send-btn:hover {
+  background: color-mix(in oklch, var(--agent-surface-foreground) 10%, transparent);
+  color: var(--agent-surface-foreground);
 }
-.bart-send-btn:disabled {
+.agent-send-btn:disabled {
   opacity: 0.45;
   cursor: default;
   background: transparent;
-  color: var(--bart-muted-foreground);
+  color: var(--agent-muted-foreground);
 }
 
 /* ---------- glass (shared by every variant) ---------- */
@@ -568,7 +671,7 @@
 /*
  * Glassmorphism: a translucent tint over a strong saturated blur, plus a
  * diagonal sheen so light appears to play across the surface. Tunable via
- * --bart-glass and --bart-glass-sheen. Shared by every variant.
+ * --agent-glass and --agent-glass-sheen. Shared by every variant.
  *
  * Deliberately carries no border and no box-shadow. Pairing either with
  * backdrop-filter on this element makes the browser leave a pale unfiltered
@@ -581,102 +684,134 @@
  * Callers set their own border-radius; declared before the variant sections so
  * each variant's own radius wins.
  */
-.bart-glass {
+.agent-glass {
   background:
-    linear-gradient(160deg, var(--bart-glass-sheen), transparent 55%),
-    var(--bart-glass);
+    linear-gradient(160deg, var(--agent-glass-sheen), transparent 55%),
+    var(--agent-glass);
   backdrop-filter: blur(24px) saturate(1.8);
   -webkit-backdrop-filter: blur(24px) saturate(1.8);
-  border-radius: calc(var(--bart-radius) + 0.25rem);
+  border-radius: calc(var(--agent-radius) + 0.25rem);
 }
 
 @supports not (backdrop-filter: blur(1px)) {
-  .bart-glass { background: var(--bart-surface); }
+  .agent-glass { background: var(--agent-surface); }
 }
 
 @media (prefers-reduced-transparency: reduce) {
-  .bart-glass {
-    background: var(--bart-surface);
+  .agent-glass {
+    background: var(--agent-surface);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
-  .bart-spotlight-backdrop { backdrop-filter: none; }
+  .agent-spotlight-backdrop { backdrop-filter: none; }
 }
 
 /* ---------- solid (the default appearance) ---------- */
 
 /*
- * The default surface: opaque --bart-surface (white in light mode) instead of
+ * The default surface: opaque --agent-surface (white in light mode) instead of
  * glass. No backdrop-filter here, so a plain border is safe — the
- * unfiltered-band bug described at .bart-glass only afflicts filtered
- * surfaces. Still no box-shadow, by project rule. Shares .bart-glass's
+ * unfiltered-band bug described at .agent-glass only afflicts filtered
+ * surfaces. Still no box-shadow, by project rule. Shares .agent-glass's
  * default radius so variant overrides below apply to either surface.
  */
-.bart-solid {
-  background: var(--bart-surface);
-  border: 1px solid var(--bart-border);
-  border-radius: calc(var(--bart-radius) + 0.25rem);
+.agent-solid {
+  background: var(--agent-surface);
+  border: 1px solid var(--agent-border);
+  border-radius: calc(var(--agent-radius) + 0.25rem);
 }
 
 /* Panels that meet a screen edge drop borders. The dock panel is borderless
    by default — its background against the page is enough of an edge. The
    sidebar keeps only the line facing the page. */
-.bart-dock-panel.bart-solid { border: none; }
-.bart-sidebar-panel.bart-solid { border: none; }
-.bart-sidebar-panel.bart-solid.bart-side-right {
-  border-left: 1px solid var(--bart-border);
+.agent-dock-panel.agent-solid { border: none; }
+.agent-sidebar-panel.agent-solid { border: none; }
+.agent-sidebar-panel.agent-solid.agent-side-right {
+  border-left: 1px solid var(--agent-border);
 }
-.bart-sidebar-panel.bart-solid.bart-side-left {
-  border-right: 1px solid var(--bart-border);
+.agent-sidebar-panel.agent-solid.agent-side-left {
+  border-right: 1px solid var(--agent-border);
 }
 
 /* ---------- dock variant ---------- */
 
-.bart-dock-tab {
+.agent-dock-frame {
   position: fixed;
   bottom: 0;
   z-index: 40;
+  min-width: 0;
+  min-height: 0;
+}
+.agent-dock-frame[data-state="opening"],
+.agent-dock-frame[data-state="closing"] {
+  transition:
+    width 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+    height 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+    left 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+    right 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.agent-dock-right { right: 1.5rem; }
+.agent-dock-left { left: 1.5rem; }
+
+.agent-dock-tab {
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 100%;
+  min-height: 100%;
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
-  border: 1px solid var(--bart-border);
+  border: 1px solid var(--agent-border);
   border-bottom: none;
-  border-radius: var(--bart-radius) var(--bart-radius) 0 0;
-  background: var(--bart-primary);
-  color: var(--bart-primary-foreground);
+  border-radius: var(--agent-radius) var(--agent-radius) 0 0;
+  background: var(--agent-primary);
+  color: var(--agent-primary-foreground);
   padding: 0.5rem 1.125rem;
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
   box-shadow: 0 -4px 16px oklch(0 0 0 / 0.12);
-  /* Appears as the panel finishes closing: rise from the bottom edge so the
-     header reads as shrinking back into the tab. */
-  animation: bart-dock-tab-in 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.bart-dock-right { right: 1.5rem; }
-.bart-dock-left { left: 1.5rem; }
 
-.bart-dock-panel {
-  position: fixed;
-  bottom: 0;
-  z-index: 40;
-  width: 24rem;
-  height: 28rem;
-  min-width: 20rem;
-  min-height: 20rem;
-  max-width: min(32rem, calc(100vw - 2rem));
-  max-height: min(52rem, 92dvh);
+.agent-dock-panel {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  /* Background comes from .agent-glass. No border or box-shadow here: either
+     would re-trigger the unfiltered-band bug described at .agent-glass. */
+  border-radius: var(--agent-radius) var(--agent-radius) 0 0;
+}
+
+/* Clip conversation content to the growing frame without clipping resize
+   handles, whose hit areas intentionally reach a few pixels outside it. */
+.agent-dock-contents {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
-  /* Background comes from .bart-glass. No border or box-shadow here: either
-     would re-trigger the unfiltered-band bug described at .bart-glass. */
-  border-radius: var(--bart-radius) var(--bart-radius) 0 0;
-  animation: bart-dock-in 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+/* The collapsed tab and expanded dock header are the same painted primary
+   color, so the bottom-anchored size transition reads as one object. */
+.agent-dock-panel .agent-panel-header {
+  background: var(--agent-primary);
+}
+
+.agent-dock-frame[data-state="opening"] .agent-panel-actions {
+  animation: agent-dock-actions-in 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.agent-dock-frame[data-state="closing"] .agent-panel-actions {
+  animation: agent-dock-actions-out 0.18s ease-in forwards;
 }
 /* Every resize affordance, corner or edge: invisible, with the directional
    cursor doing all the signalling. Hit areas stay narrow — a generous grab zone
    reaches into the header and swallows presses meant for the panel. */
-.bart-resize-handle {
+.agent-resize-handle {
   position: absolute;
   z-index: 2;
   border: 0;
@@ -689,35 +824,35 @@
 /* Both panels take a fixed full-width layout on small screens, so there is
    nothing left to drag. */
 @media (max-width: 640px) {
-  .bart-resize-handle { display: none; }
+  .agent-resize-handle { display: none; }
 }
 
-.bart-dock-resize {
+.agent-dock-resize {
   top: -0.25rem;
   left: -0.25rem;
   width: 1.05rem;
   height: 1.05rem;
-  color: var(--bart-primary-foreground);
+  color: var(--agent-primary-foreground);
   cursor: nwse-resize;
 }
 
 /* Edge bars, inset past the corner handle so the two never fight over the
    same pixels — the corner owns the diagonal, each bar owns one axis. */
-.bart-dock-edge-top {
+.agent-dock-edge-top {
   top: -0.2rem;
   height: 0.45rem;
   cursor: ns-resize;
 }
-.bart-dock-edge-side {
+.agent-dock-edge-side {
   bottom: 0;
   width: 0.45rem;
   cursor: ew-resize;
 }
-.bart-dock-right .bart-dock-edge-top { left: 0.8rem; right: 0; }
-.bart-dock-right .bart-dock-edge-side { left: -0.2rem; top: 0.8rem; }
-.bart-dock-left .bart-dock-edge-top { right: 0.8rem; left: 0; }
-.bart-dock-left .bart-dock-edge-side { right: -0.2rem; top: 0.8rem; }
-.bart-dock-resize::before {
+.agent-dock-right .agent-dock-edge-top { left: 0.8rem; right: 0; }
+.agent-dock-right .agent-dock-edge-side { left: -0.2rem; top: 0.8rem; }
+.agent-dock-left .agent-dock-edge-top { right: 0.8rem; left: 0; }
+.agent-dock-left .agent-dock-edge-side { right: -0.2rem; top: 0.8rem; }
+.agent-dock-resize::before {
   content: "";
   position: absolute;
   top: 0.28rem;
@@ -731,17 +866,17 @@
 /* Keyboard focus is the one case that must still show: these handles are
    arrow-key operable, and an invisible focus target fails WCAG 2.4.7. Hover
    deliberately does not reveal them — the cursor already says "resize". */
-.bart-resize-handle:focus-visible {
+.agent-resize-handle:focus-visible {
   opacity: 1;
-  outline: 2px solid var(--bart-accent);
+  outline: 2px solid var(--agent-accent);
   outline-offset: 1px;
 }
-.bart-dock-panel.bart-dock-left .bart-dock-resize {
+.agent-dock-left .agent-dock-panel .agent-dock-resize {
   right: -0.25rem;
   left: auto;
   cursor: nesw-resize;
 }
-.bart-dock-panel.bart-dock-left .bart-dock-resize::before {
+.agent-dock-left .agent-dock-panel .agent-dock-resize::before {
   right: 0.28rem;
   left: auto;
   border-right: 2px solid currentColor;
@@ -756,45 +891,52 @@
  * disappears the instant the drag starts. The descendant selector and
  * !important are what it takes to outrank every element's own cursor.
  */
-body.bart-resizing-nwse,
-body.bart-resizing-nwse *,
-body.bart-resizing-nesw,
-body.bart-resizing-nesw *,
-body.bart-resizing-ew,
-body.bart-resizing-ew *,
-body.bart-resizing-ns,
-body.bart-resizing-ns * {
+body.agent-resizing-nwse,
+body.agent-resizing-nwse *,
+body.agent-resizing-nesw,
+body.agent-resizing-nesw *,
+body.agent-resizing-ew,
+body.agent-resizing-ew *,
+body.agent-resizing-ns,
+body.agent-resizing-ns * {
   user-select: none;
 }
-body.bart-resizing-nwse,
-body.bart-resizing-nwse * {
+body.agent-resizing-nwse,
+body.agent-resizing-nwse * {
   cursor: nwse-resize !important;
 }
-body.bart-resizing-nesw,
-body.bart-resizing-nesw * {
+body.agent-resizing-nesw,
+body.agent-resizing-nesw * {
   cursor: nesw-resize !important;
 }
-body.bart-resizing-ew,
-body.bart-resizing-ew * {
+body.agent-resizing-ew,
+body.agent-resizing-ew * {
   cursor: ew-resize !important;
 }
-body.bart-resizing-ns,
-body.bart-resizing-ns * {
+body.agent-resizing-ns,
+body.agent-resizing-ns * {
   cursor: ns-resize !important;
 }
-.bart-dock-panel.bart-closing {
-  animation: bart-dock-out 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
 @media (max-width: 640px) {
-  .bart-dock-panel {
+  .agent-dock-frame[data-state="opening"],
+  .agent-dock-frame[data-state="open"] {
     left: 0 !important;
     right: 0 !important;
-    width: auto !important;
+    width: 100vw !important;
     height: 75dvh !important;
+  }
+  .agent-dock-frame[data-state="closing"].agent-dock-right {
+    right: 1.5rem;
+    left: auto;
+  }
+  .agent-dock-frame[data-state="closing"].agent-dock-left {
+    left: 1.5rem;
+    right: auto;
+  }
+  .agent-dock-panel {
     min-width: 0;
     min-height: 0;
-    border-radius: var(--bart-radius) var(--bart-radius) 0 0;
+    border-radius: var(--agent-radius) var(--agent-radius) 0 0;
   }
 }
 
@@ -803,27 +945,27 @@ body.bart-resizing-ns * {
 /*
  * While the sidebar is open, the page is pushed aside via a body margin so
  * content stays fully visible. On small screens the panel is full-width, so
- * no room is made. Consumers can change the width via --bart-sidebar-width.
+ * no room is made. Consumers can change the width via --agent-sidebar-width.
  */
-:root { --bart-sidebar-width: 24rem; }
+:root { --agent-sidebar-width: 24rem; }
 
-body.bart-sidebar-push {
+body.agent-sidebar-push {
   transition:
     margin-left 0.45s cubic-bezier(0.16, 1, 0.3, 1),
     margin-right 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }
 /* The open/close slide is animated, but a drag is not: easing every pointer
    move would leave the page trailing 0.45s behind the panel edge. */
-body.bart-sidebar-push.bart-resizing-ew { transition: none; }
-body.bart-sidebar-push-right { margin-right: var(--bart-sidebar-width); }
-body.bart-sidebar-push-left { margin-left: var(--bart-sidebar-width); }
+body.agent-sidebar-push.agent-resizing-ew { transition: none; }
+body.agent-sidebar-push-right { margin-right: var(--agent-sidebar-width); }
+body.agent-sidebar-push-left { margin-left: var(--agent-sidebar-width); }
 
 @media (max-width: 640px) {
-  body.bart-sidebar-push-right { margin-right: 0; }
-  body.bart-sidebar-push-left { margin-left: 0; }
+  body.agent-sidebar-push-right { margin-right: 0; }
+  body.agent-sidebar-push-left { margin-left: 0; }
 }
 
-.bart-sidebar-tab {
+.agent-sidebar-tab {
   position: fixed;
   top: 50%;
   transform: translateY(-50%);
@@ -832,80 +974,80 @@ body.bart-sidebar-push-left { margin-left: var(--bart-sidebar-width); }
   flex-direction: column;
   align-items: center;
   gap: 0.375rem;
-  background: var(--bart-primary);
-  color: var(--bart-primary-foreground);
-  border: 1px solid var(--bart-border);
+  background: var(--agent-primary);
+  color: var(--agent-primary-foreground);
+  border: 1px solid var(--agent-border);
   padding: 0.75rem 0.375rem;
   cursor: pointer;
   font-size: 0.8125rem;
   font-weight: 600;
   /* Appears as the panel finishes closing: slide in from the screen edge. */
-  animation: bart-side-tab-in 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: agent-side-tab-in 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.bart-sidebar-tab.bart-side-right { right: 0; border-right: none; border-radius: var(--bart-radius) 0 0 var(--bart-radius); }
-.bart-sidebar-tab.bart-side-left { left: 0; border-left: none; border-radius: 0 var(--bart-radius) var(--bart-radius) 0; --bart-tab-from: -110%; }
-.bart-sidebar-tab-label { writing-mode: vertical-rl; letter-spacing: 0.05em; }
-.bart-sidebar-tab.bart-side-left .bart-sidebar-tab-label { transform: rotate(180deg); }
+.agent-sidebar-tab.agent-side-right { right: 0; border-right: none; border-radius: var(--agent-radius) 0 0 var(--agent-radius); }
+.agent-sidebar-tab.agent-side-left { left: 0; border-left: none; border-radius: 0 var(--agent-radius) var(--agent-radius) 0; --agent-tab-from: -110%; }
+.agent-sidebar-tab-label { writing-mode: vertical-rl; letter-spacing: 0.05em; }
+.agent-sidebar-tab.agent-side-left .agent-sidebar-tab-label { transform: rotate(180deg); }
 
-.bart-sidebar-button {
+.agent-sidebar-button {
   position: fixed;
   bottom: 1.5rem;
   z-index: 40;
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
-  border: 1px solid var(--bart-border);
+  border: 1px solid var(--agent-border);
   border-radius: 999px;
-  background: var(--bart-primary);
-  color: var(--bart-primary-foreground);
+  background: var(--agent-primary);
+  color: var(--agent-primary-foreground);
   padding: 0.625rem 1.125rem;
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
   box-shadow: 0 4px 16px oklch(0 0 0 / 0.16);
   /* Appears as the panel finishes closing: settle in from the panel's edge. */
-  animation: bart-sidebar-button-in 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: agent-sidebar-button-in 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.bart-sidebar-button.bart-side-right { right: 1.5rem; }
-.bart-sidebar-button.bart-side-left { left: 1.5rem; }
-.bart-sidebar-button:hover { filter: brightness(1.08); }
+.agent-sidebar-button.agent-side-right { right: 1.5rem; }
+.agent-sidebar-button.agent-side-left { left: 1.5rem; }
+.agent-sidebar-button:hover { filter: brightness(1.08); }
 
-.bart-sidebar-panel {
+.agent-sidebar-panel {
   position: fixed;
   top: 0;
   bottom: 0;
   z-index: 40;
-  width: var(--bart-sidebar-width);
+  width: var(--agent-sidebar-width);
   display: flex;
   flex-direction: column;
-  /* Background comes from .bart-glass; see the note there on why this panel
+  /* Background comes from .agent-glass; see the note there on why this panel
      carries no border or box-shadow of its own. */
   border-radius: 0;
-  animation: bart-slide-in 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: agent-slide-in 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.bart-sidebar-panel.bart-side-right { right: 0; }
-.bart-sidebar-panel.bart-side-left { left: 0; }
+.agent-sidebar-panel.agent-side-right { right: 0; }
+.agent-sidebar-panel.agent-side-left { left: 0; }
 
 /* Full-height grab bar on whichever edge faces the page. */
-.bart-sidebar-resize {
+.agent-sidebar-resize {
   top: 0;
   bottom: 0;
   width: 0.45rem;
   cursor: ew-resize;
 }
-.bart-sidebar-panel.bart-side-right .bart-sidebar-resize { left: -0.2rem; }
-.bart-sidebar-panel.bart-side-left .bart-sidebar-resize { right: -0.2rem; }
-.bart-sidebar-panel .bart-panel-header { border-radius: 0; }
+.agent-sidebar-panel.agent-side-right .agent-sidebar-resize { left: -0.2rem; }
+.agent-sidebar-panel.agent-side-left .agent-sidebar-resize { right: -0.2rem; }
+.agent-sidebar-panel .agent-panel-header { border-radius: 0; }
 
 @media (max-width: 640px) {
-  .bart-sidebar-panel { width: 100%; }
+  .agent-sidebar-panel { width: 100%; }
 }
 
 /* ---------- spotlight variant ---------- */
 
 /* Flex keeps the icon on the text line: consumer CSS resets (Tailwind
    preflight) set svg to display: block, which would wrap it otherwise. */
-.bart-spotlight-hint {
+.agent-spotlight-hint {
   position: fixed;
   bottom: 1rem;
   right: 1.5rem;
@@ -917,7 +1059,7 @@ body.bart-sidebar-push-left { margin-left: var(--bart-sidebar-width); }
 }
 
 /* Vertically and horizontally centered over a dimmed, blurred backdrop. */
-.bart-spotlight-root {
+.agent-spotlight-root {
   position: fixed;
   inset: 0;
   z-index: 50;
@@ -926,48 +1068,48 @@ body.bart-sidebar-push-left { margin-left: var(--bart-sidebar-width); }
   justify-content: center;
 }
 
-.bart-spotlight-backdrop {
+.agent-spotlight-backdrop {
   position: absolute;
   inset: 0;
   /* Dim lightly so page colors stay visible through the glass above. */
   background: oklch(0 0 0 / 0.22);
   backdrop-filter: blur(3px);
-  animation: bart-fade-in 0.25s ease-out;
+  animation: agent-fade-in 0.25s ease-out;
 }
 
-.bart-spotlight-container {
+.agent-spotlight-container {
   position: relative;
   margin: 0 auto;
   width: min(38rem, calc(100vw - 2rem));
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  animation: bart-spotlight-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: agent-spotlight-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.bart-spotlight-inputcard { padding: 0.5rem 0.75rem; }
-.bart-spotlight-input .bart-input-row { border-top: none; padding: 0.25rem 0; }
-.bart-spotlight-input .bart-quote-list { padding: 0.375rem 0.25rem 0.5rem; }
-.bart-spotlight-input .bart-quote-chip-text { max-width: 26rem; }
+.agent-spotlight-inputcard { padding: 0.5rem 0.75rem; }
+.agent-spotlight-input .agent-input-row { border-top: none; padding: 0.25rem 0; }
+.agent-spotlight-input .agent-quote-list { padding: 0.375rem 0.25rem 0.5rem; }
+.agent-spotlight-input .agent-quote-chip-text { max-width: 26rem; }
 /* The glass card is the field: the inner shell drops its own border. */
-.bart-spotlight-input .bart-input-shell {
+.agent-spotlight-input .agent-input-shell {
   border: none;
   background: transparent;
   padding: 0;
 }
-.bart-spotlight-input .bart-input-shell:focus-within {
+.agent-spotlight-input .agent-input-shell:focus-within {
   outline: none;
 }
-.bart-spotlight-input .bart-input {
+.agent-spotlight-input .agent-input {
   font-size: 1.0625rem;
   padding: 0.5rem 0.25rem;
 }
-.bart-spotlight-input .bart-send-btn {
+.agent-spotlight-input .agent-send-btn {
   width: 2.1rem;
   height: 2.1rem;
 }
 
-.bart-spotlight-meta {
+.agent-spotlight-meta {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -976,13 +1118,13 @@ body.bart-sidebar-push-left { margin-left: var(--bart-sidebar-width); }
 }
 
 /* Actions sit together in the bottom-right corner of the card. */
-.bart-spotlight-actions {
+.agent-spotlight-actions {
   margin-left: auto;
   display: flex;
   align-items: center;
   gap: 0.375rem;
 }
-.bart-spotlight-actions .bart-btn-ghost {
+.agent-spotlight-actions .agent-btn-ghost {
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
@@ -991,14 +1133,14 @@ body.bart-sidebar-push-left { margin-left: var(--bart-sidebar-width); }
 /* The exit mirrors the entrance: the backdrop's dim and blur fade out with the
    card rather than snapping away under it. `forwards` holds the final frame
    until the animationend commit unmounts the tree. */
-.bart-spotlight-container.bart-closing {
-  animation: bart-spotlight-out 0.2s cubic-bezier(0.4, 0, 1, 1) forwards;
+.agent-spotlight-container.agent-closing {
+  animation: agent-spotlight-out 0.2s cubic-bezier(0.4, 0, 1, 1) forwards;
 }
-.bart-spotlight-backdrop.bart-closing {
-  animation: bart-fade-out 0.2s ease-in forwards;
+.agent-spotlight-backdrop.agent-closing {
+  animation: agent-fade-out 0.2s ease-in forwards;
 }
 
-.bart-spotlight-results {
+.agent-spotlight-results {
   max-height: 46vh;
   display: flex;
   flex-direction: column;
@@ -1007,124 +1149,137 @@ body.bart-sidebar-push-left { margin-left: var(--bart-sidebar-width); }
 
 /* On small screens (touch keyboards) anchor near the top instead of center. */
 @media (max-width: 640px) {
-  .bart-spotlight-root { justify-content: flex-start; padding-top: 8vh; }
+  .agent-spotlight-root { justify-content: flex-start; padding-top: 8vh; }
 }
 
 /* ---------- highlight overlay ---------- */
 
-.bart-highlight-overlay {
+.agent-highlight-overlay {
   position: absolute;
-  /* Above page content, but below every Bart surface: the overlay marks a
+  /* Above page content, but below every Agent surface: the overlay marks a
      page element, so it must never paint over the dock/sidebar (40), the
      spotlight (50), or the selection popover (70). */
   z-index: 30;
   pointer-events: none;
-  border-width: var(--bart-highlight-border-width);
-  border-style: var(--bart-highlight-border-style);
-  border-color: var(--bart-highlight-border-color);
-  border-radius: var(--bart-highlight-radius);
-  background: var(--bart-highlight-fill);
-  box-shadow: 0 0 0 4px var(--bart-highlight-ring-color);
-  animation: bart-highlight-pulse 1.4s ease-in-out infinite;
+  border-width: var(--agent-highlight-border-width);
+  border-style: var(--agent-highlight-border-style);
+  border-color: var(--agent-highlight-border-color);
+  border-radius: var(--agent-highlight-radius);
+  background: var(--agent-highlight-fill);
+  box-shadow: 0 0 0 4px var(--agent-highlight-ring-color);
+  animation: agent-highlight-pulse 1.4s ease-in-out infinite;
 }
 
 /* ---------- motion ---------- */
 
-@keyframes bart-pulse {
+@keyframes agent-pulse {
   0%, 100% { opacity: 0.35; transform: translateY(0); }
   50% { opacity: 1; transform: translateY(-2px); }
 }
 
-@keyframes bart-slide-in {
-  from { transform: translateX(var(--bart-slide-from, 100%)); }
+@keyframes agent-slide-in {
+  from { transform: translateX(var(--agent-slide-from, 100%)); }
   to { transform: translateX(0); }
 }
-@keyframes bart-slide-out {
+@keyframes agent-slide-out {
   from { transform: translateX(0); }
-  to { transform: translateX(var(--bart-slide-from, 100%)); }
+  to { transform: translateX(var(--agent-slide-from, 100%)); }
 }
-.bart-sidebar-panel.bart-side-left { --bart-slide-from: -100%; }
-.bart-sidebar-panel.bart-closing {
-  animation: bart-slide-out 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-@keyframes bart-dock-in {
-  from { transform: translateY(105%); opacity: 0.5; }
-  to { transform: translateY(0); opacity: 1; }
-}
-@keyframes bart-dock-out {
-  from { transform: translateY(0); opacity: 1; }
-  to { transform: translateY(105%); opacity: 0.5; }
+.agent-sidebar-panel.agent-side-left { --agent-slide-from: -100%; }
+.agent-sidebar-panel.agent-closing {
+  animation: agent-slide-out 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-@keyframes bart-dock-tab-in {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
-}
-
-/* The sidebar tab's resting transform centers it vertically; the entrance
-   keyframes must carry that translateY. */
-@keyframes bart-side-tab-in {
-  from { transform: translateY(-50%) translateX(var(--bart-tab-from, 110%)); }
-  to { transform: translateY(-50%) translateX(0); }
-}
-
-@keyframes bart-sidebar-button-in {
-  from { opacity: 0; transform: scale(0.9); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-@keyframes bart-spotlight-in {
-  from { opacity: 0; transform: scale(0.97) translateY(10px); }
-  to { opacity: 1; transform: none; }
-}
-
-@keyframes bart-spotlight-out {
-  from { opacity: 1; transform: none; }
-  to { opacity: 0; transform: scale(0.98) translateY(6px); }
-}
-
-@keyframes bart-fade-in {
-  from { opacity: 0; }
+@keyframes agent-dock-actions-in {
+  0%, 45% { opacity: 0; }
   to { opacity: 1; }
 }
-
-@keyframes bart-fade-out {
+@keyframes agent-dock-actions-out {
   from { opacity: 1; }
   to { opacity: 0; }
 }
 
-@keyframes bart-popover-in {
-  from { opacity: 0; transform: translate(-50%, calc(-100% - 0.125rem)); }
-  to { opacity: 1; transform: translate(-50%, calc(-100% - 0.5rem)); }
+/* The sidebar tab's resting transform centers it vertically; the entrance
+   keyframes must carry that translateY. */
+@keyframes agent-side-tab-in {
+  from { transform: translateY(-50%) translateX(var(--agent-tab-from, 110%)); }
+  to { transform: translateY(-50%) translateX(0); }
 }
 
-@keyframes bart-popover-out {
-  from { opacity: 1; transform: translate(-50%, calc(-100% - 0.5rem)); }
-  to { opacity: 0; transform: translate(-50%, calc(-100% - 0.25rem)); }
+@keyframes agent-sidebar-button-in {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
 }
 
-@keyframes bart-highlight-pulse {
-  0%, 100% { box-shadow: 0 0 0 4px var(--bart-highlight-ring-color); }
+@keyframes agent-spotlight-in {
+  from { opacity: 0; transform: scale(0.97) translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes agent-spotlight-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: scale(0.98) translateY(6px); }
+}
+
+@keyframes agent-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes agent-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes agent-popover-in {
+  from {
+    opacity: 0;
+    transform: translate(var(--agent-popover-x), var(--agent-popover-y))
+      translate(var(--agent-popover-from-x), var(--agent-popover-from-y));
+  }
+  to {
+    opacity: 1;
+    transform: translate(var(--agent-popover-x), var(--agent-popover-y));
+  }
+}
+
+@keyframes agent-popover-out {
+  from {
+    opacity: 1;
+    transform: translate(var(--agent-popover-x), var(--agent-popover-y));
+  }
+  to {
+    opacity: 0;
+    transform: translate(var(--agent-popover-x), var(--agent-popover-y))
+      translate(
+        calc(var(--agent-popover-from-x) * 0.5),
+        calc(var(--agent-popover-from-y) * 0.5)
+      );
+  }
+}
+
+@keyframes agent-highlight-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px var(--agent-highlight-ring-color); }
   50% { box-shadow: 0 0 0 10px transparent; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bart-typing-dots > span,
-  .bart-highlight-overlay,
-  .bart-sidebar-panel,
-  .bart-dock-panel,
-  .bart-dock-tab,
-  .bart-sidebar-tab,
-  .bart-sidebar-button,
-  .bart-spotlight-container,
-  .bart-spotlight-backdrop,
-  .bart-selection-popover {
+  .agent-typing-dots > span,
+  .agent-highlight-overlay,
+  .agent-sidebar-panel,
+  .agent-dock-frame,
+  .agent-dock-panel .agent-panel-actions,
+  .agent-sidebar-tab,
+  .agent-sidebar-button,
+  .agent-spotlight-container,
+  .agent-spotlight-backdrop,
+  .agent-selection-popover {
     animation: none;
   }
-  body.bart-sidebar-push,
-  .bart-switch-track,
-  .bart-switch-thumb {
+  body.agent-sidebar-push,
+  .agent-dock-frame,
+  .agent-switch-track,
+  .agent-switch-thumb {
     transition: none;
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useChat, type UseChatHelpers } from "@ai-sdk/react";
 import {
   DefaultChatTransport,
@@ -20,18 +20,30 @@ import {
   validateTarget,
 } from "./tool-policy";
 import type {
-  BartPublicManifest,
-  BartHighlightOptions,
-  BartToolOutput,
-  BartToolPolicies,
-  BartUIMessage,
+  AgentPublicManifest,
+  AgentHighlightOptions,
+  AgentToolOutput,
+  AgentToolPolicies,
+  AgentUIMessage,
   ToolPolicy,
 } from "./types";
 
-export type BartToolName = "navigate" | "highlight" | "interact";
+export type AgentToolName = "navigate" | "highlight" | "interact";
+
+export interface AgentReplayAction {
+  toolName: AgentToolName;
+  input: unknown;
+}
+
+export interface AgentReplayResult {
+  action: AgentReplayAction;
+  output: AgentToolOutput;
+  /** Later actions are recorded as skipped after the first replay failure. */
+  skipped?: boolean;
+}
 
 /** Runtime guard for model-supplied tool names — never trust the wire. */
-export function isBartToolName(name: unknown): name is BartToolName {
+export function isAgentToolName(name: unknown): name is AgentToolName {
   return name === "navigate" || name === "highlight" || name === "interact";
 }
 
@@ -50,14 +62,14 @@ function skipConfirm(policy: ToolPolicy): ToolPolicy {
   return policy === "confirm" ? "auto" : policy;
 }
 
-export interface UseBartChatOptions {
+export interface UseAgentChatOptions {
   api: string;
   currentRoute: string;
   navigate: (route: string) => void;
-  manifest: BartPublicManifest;
-  toolPolicy?: Partial<BartToolPolicies>;
+  manifest: AgentPublicManifest;
+  toolPolicy?: Partial<AgentToolPolicies>;
   /** Consumer-owned styling and timing for highlights and click flashes. */
-  highlightOptions?: BartHighlightOptions;
+  highlightOptions?: AgentHighlightOptions;
   /** Hard cap on navigations per assistant turn to prevent loops. */
   maxNavigationsPerTurn?: number;
   /** Hard cap on element clicks per assistant turn to prevent loops. */
@@ -66,11 +78,11 @@ export interface UseBartChatOptions {
   maxPendingSelections?: number;
 }
 
-export interface UseBartChatReturn {
-  messages: BartUIMessage[];
-  status: UseChatHelpers<BartUIMessage>["status"];
+export interface UseAgentChatReturn {
+  messages: AgentUIMessage[];
+  status: UseChatHelpers<AgentUIMessage>["status"];
   error: Error | undefined;
-  policies: BartToolPolicies;
+  policies: AgentToolPolicies;
   sendText: (text: string) => void;
   stop: () => void;
   clearError: () => void;
@@ -86,26 +98,41 @@ export interface UseBartChatReturn {
   setAutoApprove: (autoApprove: boolean) => void;
   /** Resolve a pending `confirm`-policy tool call from the approval UI. */
   respondToToolCall: (options: {
-    toolName: BartToolName;
+    toolName: AgentToolName;
     toolCallId: string;
     input: unknown;
     approved: boolean;
   }) => void;
+  /**
+   * Re-run successful historical client actions without another model turn.
+   * Current policy, manifests, runtime checks, and fresh capped counters apply.
+   */
+  replayActions: (
+    actions: readonly AgentReplayAction[],
+  ) => Promise<readonly AgentReplayResult[]>;
 }
 
+interface ExecutionCounters {
+  navigations: number;
+  interactions: number;
+}
+
+const ROUTE_SETTLE_TIMEOUT_MS = 1_500;
+const MAX_REPLAY_ACTIONS = 8;
+
 /**
- * Headless core shared by every Bart variant. Owns transport, streaming
+ * Headless core shared by every Agent variant. Owns transport, streaming
  * state, and — deliberately — all tool-policy enforcement, so replacing or
  * restyling a variant shell cannot weaken navigation/highlight rules.
  */
-export function useBartChat(options: UseBartChatOptions): UseBartChatReturn {
+export function useAgentChat(options: UseAgentChatOptions): UseAgentChatReturn {
   const { api, manifest } = options;
   const configuredPolicies = resolveToolPolicies(options.toolPolicy);
   // The user-facing "auto-approve" toggle. It only skips the approval card:
   // `confirm` becomes `auto`, while `disabled` stays disabled — the toggle can
   // never grant a capability the consumer turned off.
   const [autoApprove, setAutoApprove] = useState(false);
-  const policies = useMemo<BartToolPolicies>(() => {
+  const policies = useMemo<AgentToolPolicies>(() => {
     if (!autoApprove) return configuredPolicies;
     return {
       navigate: skipConfirm(configuredPolicies.navigate),
@@ -138,21 +165,35 @@ export function useBartChat(options: UseBartChatOptions): UseBartChatReturn {
   highlightOptionsRef.current = options.highlightOptions;
   const policiesRef = useRef(policies);
   policiesRef.current = policies;
-  const navigationsThisTurn = useRef(0);
-  const interactionsThisTurn = useRef(0);
-  const helpersRef = useRef<UseChatHelpers<BartUIMessage> | null>(null);
+  const turnCountersRef = useRef<ExecutionCounters>({
+    navigations: 0,
+    interactions: 0,
+  });
+  const replayRunningRef = useRef(false);
+  const replayGenerationRef = useRef(0);
+  const helpersRef = useRef<UseChatHelpers<AgentUIMessage> | null>(null);
+  useEffect(
+    () => () => {
+      replayGenerationRef.current += 1;
+    },
+    [],
+  );
 
-  const executeTool = useCallback(
-    (toolName: BartToolName, input: unknown): BartToolOutput => {
+  const executeToolWithCounters = useCallback(
+    (
+      toolName: AgentToolName,
+      input: unknown,
+      counters: ExecutionCounters,
+    ): AgentToolOutput => {
       if (toolName === "navigate") {
         const route = stringField(input, "route");
         if (route === undefined) return { ok: false, reason: "invalid-route" };
         const check = validateRoute(manifest, route);
         if (!check.ok) return check;
-        if (navigationsThisTurn.current >= maxNavigations) {
+        if (counters.navigations >= maxNavigations) {
           return { ok: false, reason: "navigation-limit-reached" };
         }
-        navigationsThisTurn.current += 1;
+        counters.navigations += 1;
         navigateRef.current(route);
         return { ok: true };
       }
@@ -161,10 +202,10 @@ export function useBartChat(options: UseBartChatOptions): UseBartChatReturn {
       if (toolName === "interact") {
         const check = validateInteraction(manifest, routeRef.current, target);
         if (!check.ok) return check;
-        if (interactionsThisTurn.current >= maxInteractions) {
+        if (counters.interactions >= maxInteractions) {
           return { ok: false, reason: "interaction-limit-reached" };
         }
-        interactionsThisTurn.current += 1;
+        counters.interactions += 1;
         return runInteract(target, highlightOptionsRef.current);
       }
       const check = validateTarget(manifest, routeRef.current, target);
@@ -173,10 +214,15 @@ export function useBartChat(options: UseBartChatOptions): UseBartChatReturn {
     },
     [manifest, maxNavigations, maxInteractions],
   );
+  const executeTool = useCallback(
+    (toolName: AgentToolName, input: unknown) =>
+      executeToolWithCounters(toolName, input, turnCountersRef.current),
+    [executeToolWithCounters],
+  );
 
   const transport = useMemo(
     () =>
-      new DefaultChatTransport<BartUIMessage>({
+      new DefaultChatTransport<AgentUIMessage>({
         api,
         prepareSendMessagesRequest: ({ id, messages }) => ({
           body: { id, messages, currentRoute: routeRef.current },
@@ -185,14 +231,14 @@ export function useBartChat(options: UseBartChatOptions): UseBartChatReturn {
     [api],
   );
 
-  const chat = useChat<BartUIMessage>({
+  const chat = useChat<AgentUIMessage>({
     transport,
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
     onToolCall: ({ toolCall }) => {
       const { toolName } = toolCall;
       const helpers = helpersRef.current;
       if (!helpers) return;
-      if (!isBartToolName(toolName)) {
+      if (!isAgentToolName(toolName)) {
         void helpers.addToolOutput({
           state: "output-error",
           tool: toolName,
@@ -204,7 +250,7 @@ export function useBartChat(options: UseBartChatOptions): UseBartChatReturn {
       const policy = policiesRef.current[toolName];
       // `confirm` waits for the approval UI; everything else resolves now.
       if (policy === "confirm") return;
-      const output: BartToolOutput =
+      const output: AgentToolOutput =
         policy === "disabled"
           ? { ok: false, reason: "disabled-by-policy" }
           : executeTool(toolName, toolCall.input);
@@ -226,8 +272,7 @@ export function useBartChat(options: UseBartChatOptions): UseBartChatReturn {
     (text: string) => {
       const trimmed = text.trim();
       if (trimmed.length === 0) return;
-      navigationsThisTurn.current = 0;
-      interactionsThisTurn.current = 0;
+      turnCountersRef.current = { navigations: 0, interactions: 0 };
       const quotes = quotesRef.current;
       const message =
         quotes.length > 0 ? buildQuotedMessage(quotes, trimmed) : trimmed;
@@ -244,17 +289,17 @@ export function useBartChat(options: UseBartChatOptions): UseBartChatReturn {
   }, [maxPendingSelections]);
 
   const reset = useCallback(() => {
+    replayGenerationRef.current += 1;
     void chat.stop();
     chat.setMessages([]);
     chat.clearError();
     setPendingQuotes([]);
-    navigationsThisTurn.current = 0;
-    interactionsThisTurn.current = 0;
+    turnCountersRef.current = { navigations: 0, interactions: 0 };
   }, [chat.stop, chat.setMessages, chat.clearError]);
 
-  const respondToToolCall = useCallback<UseBartChatReturn["respondToToolCall"]>(
+  const respondToToolCall = useCallback<UseAgentChatReturn["respondToToolCall"]>(
     ({ toolName, toolCallId, input, approved }) => {
-      const output: BartToolOutput = approved
+      const output: AgentToolOutput = approved
         ? { ...executeTool(toolName, input), approvedByUser: true }
         : { ok: false, reason: "denied-by-user" };
       void chat.addToolOutput({ tool: toolName, toolCallId, output });
@@ -274,8 +319,166 @@ export function useBartChat(options: UseBartChatOptions): UseBartChatReturn {
 
   const clearQuotes = useCallback(() => setPendingQuotes([]), []);
 
+  const waitForRoute = useCallback(
+    (route: string, generation: number): Promise<boolean> =>
+      new Promise((resolve) => {
+        const started = performance.now();
+        let frame = 0;
+        let settled = false;
+        let matched = false;
+        const timeout = window.setTimeout(
+          () => finish(false),
+          ROUTE_SETTLE_TIMEOUT_MS,
+        );
+        const finish = (result: boolean) => {
+          if (settled) return;
+          settled = true;
+          window.clearTimeout(timeout);
+          if (frame !== 0) window.cancelAnimationFrame(frame);
+          resolve(result);
+        };
+        const check = () => {
+          frame = 0;
+          if (replayGenerationRef.current !== generation) {
+            finish(false);
+            return;
+          }
+          if (routeRef.current === route) {
+            // Allow one committed paint after the route prop catches up before
+            // a dependent target lookup touches the new page DOM.
+            if (matched) {
+              finish(true);
+              return;
+            }
+            matched = true;
+          }
+          if (performance.now() - started >= ROUTE_SETTLE_TIMEOUT_MS) {
+            finish(false);
+            return;
+          }
+          frame = window.requestAnimationFrame(check);
+        };
+        frame = window.requestAnimationFrame(check);
+      }),
+    [],
+  );
+
+  const replayActions = useCallback<UseAgentChatReturn["replayActions"]>(
+    async (actions) => {
+      if (actions.length === 0) return [];
+      const queued = actions.slice(0, MAX_REPLAY_ACTIONS);
+      const overflow = actions.slice(MAX_REPLAY_ACTIONS);
+      if (replayRunningRef.current) {
+        return [
+          {
+            action: queued[0]!,
+            output: { ok: false, reason: "replay-in-progress" },
+          },
+          ...queued.slice(1).map((action) => ({
+            action,
+            output: { ok: false, reason: "skipped-after-failure" },
+            skipped: true,
+          })),
+          ...overflow.map((action) => ({
+            action,
+            output: { ok: false, reason: "replay-limit-reached" },
+            skipped: true,
+          })),
+        ];
+      }
+
+      replayRunningRef.current = true;
+      const generation = replayGenerationRef.current;
+      const counters: ExecutionCounters = {
+        navigations: 0,
+        interactions: 0,
+      };
+      const results: AgentReplayResult[] = [];
+      let failed = false;
+
+      try {
+        for (const [index, action] of queued.entries()) {
+          if (failed) {
+            results.push({
+              action,
+              output: { ok: false, reason: "skipped-after-failure" },
+              skipped: true,
+            });
+            continue;
+          }
+          if (replayGenerationRef.current !== generation) {
+            results.push({
+              action,
+              output: { ok: false, reason: "replay-cancelled" },
+            });
+            failed = true;
+            continue;
+          }
+          if (!isAgentToolName(action.toolName)) {
+            results.push({
+              action,
+              output: { ok: false, reason: "unknown-tool" },
+            });
+            failed = true;
+            continue;
+          }
+          if (policiesRef.current[action.toolName] === "disabled") {
+            results.push({
+              action,
+              output: { ok: false, reason: "disabled-by-policy" },
+            });
+            failed = true;
+            continue;
+          }
+
+          let output: AgentToolOutput;
+          try {
+            output = executeToolWithCounters(
+              action.toolName,
+              action.input,
+              counters,
+            );
+          } catch {
+            output = { ok: false, reason: "execution-failed" };
+          }
+          results.push({ action, output });
+          if (!output.ok) {
+            failed = true;
+            continue;
+          }
+
+          const next = queued[index + 1];
+          if (action.toolName === "navigate" && next !== undefined) {
+            const route = stringField(action.input, "route");
+            if (
+              route === undefined ||
+              !(await waitForRoute(route, generation))
+            ) {
+              results[results.length - 1] = {
+                action,
+                output: { ok: false, reason: "route-transition-failed" },
+              };
+              failed = true;
+            }
+          }
+        }
+        results.push(
+          ...overflow.map((action) => ({
+            action,
+            output: { ok: false, reason: "replay-limit-reached" },
+            skipped: true,
+          })),
+        );
+        return results;
+      } finally {
+        replayRunningRef.current = false;
+      }
+    },
+    [executeToolWithCounters, waitForRoute],
+  );
+
   // One memoized wrapper so the individually stable callbacks above actually
-  // pay off: BartProvider keys its context value on this object's identity.
+  // pay off: AgentProvider keys its context value on this object's identity.
   return useMemo(
     () => ({
       messages: chat.messages,
@@ -293,6 +496,7 @@ export function useBartChat(options: UseBartChatOptions): UseBartChatReturn {
       autoApprove,
       setAutoApprove,
       respondToToolCall,
+      replayActions,
     }),
     [
       chat.messages,
@@ -309,6 +513,7 @@ export function useBartChat(options: UseBartChatOptions): UseBartChatReturn {
       reset,
       autoApprove,
       respondToToolCall,
+      replayActions,
     ],
   );
 }

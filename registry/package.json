@@ -1,5 +1,5 @@
 {
-  "name": "@bart-ui/registry",
+  "name": "@agent-ui/registry",
   "type": "module",
   "private": true,
   "exports": {

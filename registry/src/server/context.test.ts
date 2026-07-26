@@ -3,10 +3,10 @@ import {
   formatContext,
   scoreDocument,
   selectContext,
-  type BartServerManifest,
+  type AgentServerManifest,
 } from "./context";
 
-const manifest: BartServerManifest = {
+const manifest: AgentServerManifest = {
   documents: [
     {
       route: "/",
@@ -79,10 +79,10 @@ describe("selectContext", () => {
 });
 
 describe("formatContext", () => {
-  test("delimits every block with bart-context tags", () => {
+  test("delimits every block with agent-context tags", () => {
     const { blocks } = selectContext(manifest, "/", "pricing");
     const formatted = formatContext(blocks);
-    expect(formatted).toContain('<bart-context route="/" title="Home">');
-    expect(formatted).toContain("</bart-context>");
+    expect(formatted).toContain('<agent-context route="/" title="Home">');
+    expect(formatted).toContain("</agent-context>");
   });
 });

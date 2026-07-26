@@ -2,7 +2,9 @@ import { describe, expect, test } from "bun:test";
 import {
   appendSelection,
   buildQuotedMessage,
+  fitWithinViewport,
   normalizeSelection,
+  selectionAnchor,
 } from "./selection";
 
 describe("normalizeSelection", () => {
@@ -60,5 +62,37 @@ describe("buildQuotedMessage", () => {
     expect(buildQuotedMessage(["line one", "line two"], "explain")).toBe(
       "> line one\n> line two\n\nexplain",
     );
+  });
+});
+
+describe("selectionAnchor", () => {
+  // A 100x20 selection sitting at (200, 100).
+  const box = { top: 100, right: 300, bottom: 120, left: 200 };
+
+  test("anchors each side to that edge's midpoint", () => {
+    expect(selectionAnchor(box, "top")).toEqual({ x: 250, y: 100 });
+    expect(selectionAnchor(box, "bottom")).toEqual({ x: 250, y: 120 });
+    expect(selectionAnchor(box, "left")).toEqual({ x: 200, y: 110 });
+    expect(selectionAnchor(box, "right")).toEqual({ x: 300, y: 110 });
+  });
+});
+
+describe("fitWithinViewport", () => {
+  test("leaves a popover that already fits alone", () => {
+    expect(fitWithinViewport(100, 200, 1000)).toBe(0);
+  });
+
+  test("pushes an overflowing leading edge in to the margin", () => {
+    expect(fitWithinViewport(-10, 90, 1000)).toBe(18);
+  });
+
+  test("pulls an overflowing trailing edge in to the margin", () => {
+    expect(fitWithinViewport(920, 1020, 1000)).toBe(-28);
+  });
+
+  test("keeps the leading edge visible when it cannot fit at all", () => {
+    // 1200 wide in a 1000 viewport: clamping the trailing edge would push the
+    // leading edge off-screen, so the leading edge wins.
+    expect(fitWithinViewport(0, 1200, 1000)).toBe(8);
   });
 });

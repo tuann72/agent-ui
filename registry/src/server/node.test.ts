@@ -18,22 +18,22 @@ describe("toNodeHandler", () => {
     const handler = toNodeHandler(async (request) => {
       const body = (await request.json()) as { value: number };
       expect(request.method).toBe("POST");
-      expect(new URL(request.url).pathname).toBe("/api/bart");
+      expect(new URL(request.url).pathname).toBe("/api/agent");
       return Response.json(
         { echoed: body.value },
-        { status: 201, headers: { "x-bart": "yes" } },
+        { status: 201, headers: { "x-agent": "yes" } },
       );
     });
     const server = createServer(handler);
     const port = await listen(server);
     try {
-      const response = await fetch(`http://127.0.0.1:${port}/api/bart`, {
+      const response = await fetch(`http://127.0.0.1:${port}/api/agent`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ value: 42 }),
       });
       expect(response.status).toBe(201);
-      expect(response.headers.get("x-bart")).toBe("yes");
+      expect(response.headers.get("x-agent")).toBe("yes");
       expect(await response.json()).toEqual({ echoed: 42 });
     } finally {
       server.close();

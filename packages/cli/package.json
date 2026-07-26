@@ -1,7 +1,7 @@
 {
-  "name": "@bart-ui/cli",
+  "name": "@agent-ui/cli",
   "version": "0.1.0",
-  "description": "Scaffold Bart — a portable, shadcn-style AI assistant for React — into your project. Copies the source into your repo; you own it, no runtime dependency on bart-ui.",
+  "description": "Scaffold Agent — a portable, shadcn-style AI assistant for React — into your project. Copies the source into your repo; you own it, no runtime dependency on agent-ui.",
   "keywords": [
     "ai",
     "assistant",
@@ -14,14 +14,14 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tuann72/bart-ui.git",
+    "url": "git+https://github.com/tuann72/agent-ui.git",
     "directory": "packages/cli"
   },
-  "homepage": "https://github.com/tuann72/bart-ui#readme",
-  "bugs": "https://github.com/tuann72/bart-ui/issues",
+  "homepage": "https://github.com/tuann72/agent-ui#readme",
+  "bugs": "https://github.com/tuann72/agent-ui/issues",
   "type": "module",
   "bin": {
-    "bart": "bin/bart.js"
+    "agent": "bin/agent.js"
   },
   "files": [
     "bin",

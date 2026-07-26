@@ -22,7 +22,7 @@ const cliRoot = fileURLToPath(new URL("..", import.meta.url));
 const repoRoot = fileURLToPath(new URL("../../..", import.meta.url));
 const registrySrc = join(repoRoot, "registry", "src");
 const templatesRoot = join(cliRoot, "templates");
-const dest = join(templatesRoot, "bart");
+const dest = join(templatesRoot, "agent");
 
 rmSync(templatesRoot, { recursive: true, force: true });
 

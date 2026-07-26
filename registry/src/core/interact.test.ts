@@ -19,7 +19,7 @@ afterEach(() => {
 
 describe("runInteract", () => {
   test("clicks a button target and announces it", () => {
-    mount(`<button type="button" data-bart-target="order">Order</button>`);
+    mount(`<button type="button" data-agent-target="order">Order</button>`);
     const button = document.querySelector("button")!;
     let clicks = 0;
     button.addEventListener("click", () => {
@@ -27,13 +27,13 @@ describe("runInteract", () => {
     });
     expect(runInteract("order")).toEqual({ ok: true });
     expect(clicks).toBe(1);
-    expect(document.getElementById("bart-live-region")?.textContent).toBe(
+    expect(document.getElementById("agent-live-region")?.textContent).toBe(
       "Clicked: order",
     );
   });
 
   test("clicks button-like inputs", () => {
-    mount(`<input type="submit" data-bart-target="submit-order" value="Go">`);
+    mount(`<input type="submit" data-agent-target="submit-order" value="Go">`);
     expect(runInteract("submit-order")).toEqual({ ok: true });
   });
 
@@ -42,7 +42,7 @@ describe("runInteract", () => {
   });
 
   test("rejects a non-clickable element without clicking it", () => {
-    mount(`<div data-bart-target="hero">Hero</div>`);
+    mount(`<div data-agent-target="hero">Hero</div>`);
     const div = document.querySelector("div")!;
     let clicks = 0;
     div.addEventListener("click", () => {
@@ -53,12 +53,12 @@ describe("runInteract", () => {
   });
 
   test("rejects text inputs — interact clicks, it never types", () => {
-    mount(`<input type="text" data-bart-target="search">`);
+    mount(`<input type="text" data-agent-target="search">`);
     expect(runInteract("search").reason).toBe("target-not-interactive");
   });
 
   test("rejects a disabled button without clicking it", () => {
-    mount(`<button data-bart-target="order" disabled>Order</button>`);
+    mount(`<button data-agent-target="order" disabled>Order</button>`);
     const button = document.querySelector("button")!;
     let clicks = 0;
     button.addEventListener("click", () => {

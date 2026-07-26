@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import {
   addCommand,
-  buildBartConfig,
+  buildAgentConfig,
   detectPackageManager,
   installCommand,
   isProviderId,
@@ -129,15 +129,15 @@ describe("providers", () => {
   });
 });
 
-describe("buildBartConfig", () => {
+describe("buildAgentConfig", () => {
   test("records version, paths, provider, and hashes", () => {
-    const config = buildBartConfig("0.1.0", "src/bart", "anthropic", {
+    const config = buildAgentConfig("0.1.0", "src/agent", "anthropic", {
       "index.ts": "abc123",
     });
     expect(config).toEqual({
       cli: "0.1.0",
-      dir: "src/bart",
-      content: "content/bart",
+      dir: "src/agent",
+      content: "content/agent",
       provider: "anthropic",
       files: { "index.ts": "abc123" },
     });

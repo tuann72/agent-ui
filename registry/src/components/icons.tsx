@@ -1,11 +1,11 @@
-/** Inline SVG icons shared by all Bart shells. All track currentColor. */
+/** Inline SVG icons shared by all Agent shells. All track currentColor. */
 
 interface IconProps {
   size?: number;
 }
 
-/** The Bart mark: a single filled dot. */
-export function BartIcon({ size = 15 }: IconProps) {
+/** The Agent mark: a single filled dot. */
+export function AgentIcon({ size = 15 }: IconProps) {
   return (
     <svg
       aria-hidden="true"
@@ -76,6 +76,23 @@ export function CheckIcon({ size = 12 }: IconProps) {
       strokeLinejoin="round"
     >
       <path d="M2.5 8.5l3.5 3.5 7.5-8" />
+    </svg>
+  );
+}
+
+export function PlusIcon({ size = 14 }: IconProps) {
+  return (
+    <svg
+      aria-hidden="true"
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+    >
+      <path d="M8 3v10M3 8h10" />
     </svg>
   );
 }

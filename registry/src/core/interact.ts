@@ -1,5 +1,5 @@
 import { runHighlight } from "./highlight";
-import type { BartHighlightOptions, BartToolOutput } from "./types";
+import type { AgentHighlightOptions, AgentToolOutput } from "./types";
 
 /**
  * Elements the interact tool may click. Links are deliberately excluded:
@@ -23,10 +23,10 @@ function isClickable(element: HTMLElement): boolean {
  */
 export function runInteract(
   targetId: string,
-  highlightOptions?: BartHighlightOptions,
-): BartToolOutput {
+  highlightOptions?: AgentHighlightOptions,
+): AgentToolOutput {
   const element = document.querySelector(
-    `[data-bart-target="${CSS.escape(targetId)}"]`,
+    `[data-agent-target="${CSS.escape(targetId)}"]`,
   );
   if (!(element instanceof HTMLElement)) {
     return { ok: false, reason: "target-not-found" };

@@ -1,0 +1,350 @@
+import { expect, test, type Page } from "@playwright/test";
+
+/**
+ * Full-flow coverage against the playground and its deterministic mock
+ * model: real streaming over the wire, approval cards, and the tools' actual
+ * DOM effects. Variant-behavior details live in the happy-dom contract
+ * suite; this file covers what only a browser can verify.
+ *
+ * Configuration comes from the query string rather than from clicking the
+ * control panel. That keeps these tests independent of the panel's (third
+ * party) DOM, and it exercises the same URL-driven setup a screen recording
+ * uses.
+ */
+
+const dialog = (page: Page) =>
+  page.getByRole("dialog", { name: "Agent assistant" });
+
+async function sendMessage(page: Page, text: string) {
+  await page.getByRole("textbox", { name: "Message Agent" }).fill(text);
+  await page.getByRole("button", { name: "Send message" }).click();
+}
+
+const openLauncher = (page: Page) =>
+  page.getByRole("button", { name: "Agent", exact: true }).click();
+
+test("dock streams a markdown answer from the mock model", async ({ page }) => {
+  await page.goto("/");
+  await openLauncher(page);
+  await sendMessage(page, "How much is a day pass?");
+  await expect(dialog(page).locator("table")).toContainText("Day pass");
+});
+
+test("dock launcher grows into a same-color bottom-anchored frame", async ({
+  page,
+}) => {
+  for (const appearance of ["default", "glass"] as const) {
+    await page.goto(`/?panel=0&appearance=${appearance}`);
+    const frame = page.locator('[data-agent-ui="dock-frame"]');
+    const launcher = page.getByRole("button", { name: "Agent", exact: true });
+    const closedBox = await frame.boundingBox();
+    if (!closedBox) throw new Error("closed dock frame was not measurable");
+    const closedColor = await launcher.evaluate(
+      (element) => getComputedStyle(element).backgroundColor,
+    );
+    await expect(frame).toHaveScreenshot(`dock-${appearance}-closed.png`);
+
+    await launcher.click();
+    await expect(frame).toHaveAttribute("data-state", "open");
+    await expect(dialog(page)).toBeVisible();
+    await page.waitForTimeout(500);
+
+    const openBox = await frame.boundingBox();
+    if (!openBox) throw new Error("open dock frame was not measurable");
+    expect(openBox.width).toBeGreaterThan(closedBox.width);
+    expect(openBox.height).toBeGreaterThan(closedBox.height);
+    expect(
+      Math.abs(
+        openBox.y + openBox.height - (closedBox.y + closedBox.height),
+      ),
+    ).toBeLessThan(1);
+    await expect(dialog(page).locator(".agent-panel-header")).toHaveCSS(
+      "background-color",
+      closedColor,
+    );
+    await expect(frame).toHaveScreenshot(`dock-${appearance}-open.png`, {
+      // Chromium text/icon antialiasing can move a handful of edge pixels
+      // under parallel load; the frame-level regression remains exact enough
+      // to catch color, geometry, border, and content changes.
+      maxDiffPixelRatio: 0.002,
+    });
+  }
+});
+
+test("every variant opens into a dialog and Escape closes it", async ({
+  page,
+}) => {
+  for (const variant of ["dock", "sidebar", "spotlight"] as const) {
+    await page.goto(`/?variant=${variant}`);
+    if (variant === "spotlight") {
+      await expect(page.locator(".agent-spotlight-hint")).toBeVisible();
+      await page.keyboard.press("/");
+    } else {
+      await openLauncher(page);
+    }
+    await expect(dialog(page)).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(dialog(page)).toHaveCount(0);
+  }
+});
+
+test("the spotlight shortcut stays inert while typing in its own input", async ({
+  page,
+}) => {
+  await page.goto("/?variant=spotlight");
+  // The hint is the spotlight's mounted affordance: pressing the shortcut
+  // before React attaches its listener would silently drop the keystroke.
+  await expect(page.locator(".agent-spotlight-hint")).toBeVisible();
+  await page.keyboard.press("/");
+  const input = page.getByRole("textbox", { name: "Message Agent" });
+  await input.pressSequentially("/faq");
+  // The keystroke typed text instead of retriggering the shortcut.
+  await expect(input).toHaveValue("/faq");
+  await expect(dialog(page)).toHaveCount(1);
+});
+
+test("the spotlight hint keeps its icon on the text line", async ({ page }) => {
+  await page.goto("/?variant=spotlight");
+  const hint = page.locator(".agent-spotlight-hint");
+  await expect(hint).toBeVisible();
+  // Tailwind preflight sets svg { display: block }, which once wrapped the
+  // icon onto its own line. Icon and shortcut key must overlap vertically.
+  const icon = await hint.locator("svg").boundingBox();
+  const key = await hint.locator("kbd").boundingBox();
+  if (!icon || !key) throw new Error("hint icon or kbd not rendered");
+  expect(icon.y).toBeLessThan(key.y + key.height);
+  expect(icon.y + icon.height).toBeGreaterThan(key.y);
+});
+
+test("host page centering does not leak into Agent's messages", async ({
+  page,
+}) => {
+  await page.goto("/");
+  // The default Vite starter ships `#root { text-align: center }`; Agent's
+  // panels must hold `text-align: start` against exactly this kind of host CSS.
+  await page.addStyleTag({ content: "#root, body { text-align: center; }" });
+  await openLauncher(page);
+  await sendMessage(page, "How much is a day pass?");
+  const answer = dialog(page).locator(".agent-msg-assistant .agent-markdown p").first();
+  await expect(answer).toBeVisible();
+  await expect(answer).toHaveCSS("text-align", "start");
+});
+
+test("highlight runs without approval and draws the overlay", async ({
+  page,
+}) => {
+  await page.goto("/pricing");
+  await openLauncher(page);
+  await sendMessage(page, "Highlight the membership plans");
+  const overlay = page.locator(".agent-highlight-overlay");
+  await expect(overlay).toBeVisible();
+  // Auto policy: no approval card ever appeared.
+  await expect(page.getByRole("button", { name: "Allow" })).toHaveCount(0);
+  // The overlay marks page content: it must layer below Agent's own panels.
+  const zIndexOf = (locator: ReturnType<Page["locator"]>) =>
+    locator.evaluate((el) => Number(getComputedStyle(el).zIndex));
+  // The frame, not the panel: it owns the dock's place on the z-scale.
+  expect(await zIndexOf(overlay)).toBeLessThan(
+    await zIndexOf(page.locator('[data-agent-ui="dock-frame"]')),
+  );
+});
+
+test("interact asks for approval, then clicks the pricing page button", async ({
+  page,
+}) => {
+  await page.goto("/pricing");
+  await openLauncher(page);
+  await sendMessage(page, "Start a membership signup for me");
+
+  await expect(
+    page.getByText("Agent wants to click “start-membership”"),
+  ).toBeVisible();
+  // Nothing happened on the page while approval is pending.
+  await expect(page.getByText("Signup started")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Allow" }).click();
+  // Scoped to the page: Agent's own transcript also announces status.
+  await expect(page.locator("main").getByRole("status")).toContainText(
+    "Signup started",
+  );
+  await expect(
+    page.getByText("You approved clicking “start-membership”"),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Done — your membership signup is started."),
+  ).toBeVisible();
+});
+
+test("interact resolves the right target on a second page", async ({ page }) => {
+  // Two interactive targets exist on different routes; the follow-up message
+  // has to reflect which one was actually clicked.
+  await page.goto("/faq");
+  await openLauncher(page);
+  await sendMessage(page, "Sign the waiver for me");
+
+  await expect(
+    page.getByText("Agent wants to click “sign-waiver”"),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Allow" }).click();
+  await expect(page.locator("main").getByRole("status")).toContainText(
+    "Waiver signed",
+  );
+  await expect(
+    page.getByText("Done — your waiver is signed and good for a year."),
+  ).toBeVisible();
+});
+
+test("denying an interact call leaves the page untouched", async ({ page }) => {
+  await page.goto("/pricing");
+  await openLauncher(page);
+  await sendMessage(page, "Start a membership signup for me");
+
+  await expect(
+    page.getByText("Agent wants to click “start-membership”"),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Deny" }).click();
+  await expect(
+    page.getByText("You denied clicking “start-membership”"),
+  ).toBeVisible();
+  await expect(page.getByText("Signup started")).toHaveCount(0);
+});
+
+test("navigate pushes a real history entry the back button can undo", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await openLauncher(page);
+  await sendMessage(page, "Take me to the pricing page");
+  await page.getByRole("button", { name: "Allow" }).click();
+  await expect(page).toHaveURL(/\/pricing/);
+  await page.goBack();
+  await expect(page).toHaveURL(/localhost:5183\/$/);
+});
+
+test("the ask popover attaches to each of the four selection sides", async ({
+  page,
+}) => {
+  const popover = page.locator('[data-agent-ui="selection-popover"]');
+
+  for (const side of ["top", "bottom", "left", "right"] as const) {
+    // The side is a URL knob, so each pass starts from a clean, known state.
+    await page.goto(`/faq?askSide=${side}`);
+    // An answer paragraph sits inside the indented content column, so there is
+    // room on every side for the popover to land where it was asked to.
+    const paragraph = page.locator("main dd").first();
+    // Centered in the viewport, so all four sides have somewhere to go: the
+    // popover is nudged back on screen near an edge, which would otherwise
+    // read as the side being ignored.
+    await paragraph.evaluate((el) => el.scrollIntoView({ block: "center" }));
+    await paragraph.click({ clickCount: 3 });
+    await expect(popover).toBeVisible();
+    await expect(popover).toHaveAttribute("data-side", side);
+
+    const text = (await paragraph.boundingBox())!;
+    const box = (await popover.boundingBox())!;
+    const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    // Centers, not edges: near a viewport edge the popover is nudged back
+    // on screen, which can bring an edge flush with the selection's.
+    if (side === "top") expect(center.y).toBeLessThan(text.y);
+    if (side === "bottom") expect(center.y).toBeGreaterThan(text.y + text.height);
+    if (side === "left") expect(center.x).toBeLessThan(text.x);
+    if (side === "right") expect(center.x).toBeGreaterThan(text.x + text.width);
+  }
+});
+
+test("selection plus queues context without opening any shell", async ({
+  page,
+}) => {
+  for (const variant of ["dock", "sidebar", "spotlight"] as const) {
+    await page.goto(`/?panel=0&variant=${variant}`);
+    const paragraph = page.locator("main p").nth(1);
+    const selected = (await paragraph.textContent())?.replace(/\s+/g, " ").trim();
+    if (!selected) throw new Error("selection fixture had no text");
+
+    await paragraph.click({ clickCount: 3 });
+    const addContext = page.getByRole("button", {
+      name: "Add selection to Agent context",
+    });
+    await expect(addContext).toBeVisible();
+    // A live Selection can make Chromium report the animated popover as
+    // geometrically unstable. Invoke the actual button after it is visible;
+    // this still exercises React's click path without collapsing selection
+    // during Playwright's pointer-stability checks.
+    await addContext.evaluate((button: HTMLButtonElement) => button.click());
+    await expect(dialog(page)).toHaveCount(0);
+
+    if (variant === "spotlight") {
+      await page.keyboard.press("/");
+    } else {
+      await openLauncher(page);
+    }
+    const quoteList = page.getByRole("list", {
+      name: "Selected text to ask about",
+    });
+    await expect(quoteList).toBeVisible();
+    await expect(quoteList).toContainText(selected);
+  }
+});
+
+test("a multi-action group replays locally without another API request", async ({
+  page,
+}) => {
+  let agentRequests = 0;
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname === "/api/agent") agentRequests += 1;
+  });
+
+  await page.goto("/pricing?panel=0");
+  await openLauncher(page);
+  await sendMessage(page, "Highlight the day passes and gear rentals");
+  await expect(
+    page.getByText("There it is — I've highlighted it on the page for you."),
+  ).toBeVisible();
+
+  const actionGroup = page.getByRole("region", { name: "Agent actions" });
+  await expect(actionGroup).toHaveCount(1);
+  await expect(actionGroup.locator(".agent-tool-row")).toHaveCount(2);
+  const beforeReplay = agentRequests;
+
+  await actionGroup.getByRole("button", { name: "Replay actions" }).click();
+  await expect(
+    actionGroup.getByText("Replayed: Highlighted “day-passes”"),
+  ).toBeVisible();
+  await expect(
+    actionGroup.getByText("Replayed: Highlighted “gear-rentals”"),
+  ).toBeVisible();
+  expect(agentRequests).toBe(beforeReplay);
+
+  await page
+    .locator('[data-agent-target="day-passes"]')
+    .evaluate((element) => element.remove());
+  await actionGroup.getByRole("button", { name: "Replay actions" }).click();
+  await expect(actionGroup.getByText(/target-not-found/)).toBeVisible();
+  await expect(
+    actionGroup.getByText("Skipped after an earlier action failed"),
+  ).toBeVisible();
+  expect(agentRequests).toBe(beforeReplay);
+});
+
+test("the control panel collapses to its edge tab and back", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const pane = page.locator(".playground-pane");
+  await expect(pane).toBeVisible();
+
+  await page.getByRole("button", { name: "Hide playground controls" }).click();
+  await expect(pane).toHaveCount(0);
+  await expect(page).toHaveURL(/panel=0/);
+
+  await page.getByRole("button", { name: "Show playground controls" }).click();
+  await expect(pane).toBeVisible();
+
+  // `h` toggles it too, and must not fire while typing in Agent's input.
+  await page.keyboard.press("h");
+  await expect(pane).toHaveCount(0);
+  await openLauncher(page);
+  await page.getByRole("textbox", { name: "Message Agent" }).pressSequentially("hi");
+  await expect(page.getByRole("textbox", { name: "Message Agent" })).toHaveValue("hi");
+  await expect(pane).toHaveCount(0);
+});

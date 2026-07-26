@@ -1,10 +1,10 @@
 import type {
-  BartPublicManifest,
-  BartToolOutput,
-  BartToolPolicies,
+  AgentPublicManifest,
+  AgentToolOutput,
+  AgentToolPolicies,
 } from "./types";
 
-export const DEFAULT_TOOL_POLICIES: BartToolPolicies = {
+export const DEFAULT_TOOL_POLICIES: AgentToolPolicies = {
   navigate: "confirm",
   highlight: "auto",
   // Clicking mutates page state, so it defaults to confirm like navigation.
@@ -12,8 +12,8 @@ export const DEFAULT_TOOL_POLICIES: BartToolPolicies = {
 };
 
 export function resolveToolPolicies(
-  overrides?: Partial<BartToolPolicies>,
-): BartToolPolicies {
+  overrides?: Partial<AgentToolPolicies>,
+): AgentToolPolicies {
   return { ...DEFAULT_TOOL_POLICIES, ...overrides };
 }
 
@@ -22,9 +22,9 @@ export function resolveToolPolicies(
  * generated manifest are accepted, regardless of what the model produced.
  */
 export function validateRoute(
-  manifest: BartPublicManifest,
+  manifest: AgentPublicManifest,
   route: unknown,
-): BartToolOutput {
+): AgentToolOutput {
   if (typeof route !== "string" || route.length === 0) {
     return { ok: false, reason: "invalid-route" };
   }
@@ -42,10 +42,10 @@ export function validateRoute(
  * the page the user is currently on.
  */
 export function validateTarget(
-  manifest: BartPublicManifest,
+  manifest: AgentPublicManifest,
   currentRoute: string,
   target: unknown,
-): BartToolOutput {
+): AgentToolOutput {
   if (typeof target !== "string" || target.length === 0) {
     return { ok: false, reason: "invalid-target" };
   }
@@ -65,10 +65,10 @@ export function validateTarget(
  * highlighting is never clickable by default.
  */
 export function validateInteraction(
-  manifest: BartPublicManifest,
+  manifest: AgentPublicManifest,
   currentRoute: string,
   target: unknown,
-): BartToolOutput {
+): AgentToolOutput {
   if (typeof target !== "string" || target.length === 0) {
     return { ok: false, reason: "invalid-target" };
   }

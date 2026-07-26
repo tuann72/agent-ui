@@ -1,33 +1,33 @@
-export { BartChat, type BartChatProps } from "./components/bart-chat";
+export { AgentChat, type AgentChatProps } from "./components/agent-chat";
 export {
-  BartProvider,
-  useBartContext,
-  useCloseBart,
-  type BartContextValue,
-  type BartProviderProps,
-} from "./components/bart-provider";
-export { BartDock, type BartDockProps } from "./components/dock";
+  AgentProvider,
+  useAgentContext,
+  useCloseAgent,
+  type AgentContextValue,
+  type AgentProviderProps,
+} from "./components/agent-provider";
+export { AgentDock, type AgentDockProps } from "./components/dock";
 export {
-  BartSidebar,
-  type BartSidebarProps,
+  AgentSidebar,
+  type AgentSidebarProps,
   type SidebarLauncher,
 } from "./components/sidebar";
 export {
-  BartSpotlight,
-  type BartSpotlightProps,
+  AgentSpotlight,
+  type AgentSpotlightProps,
 } from "./components/spotlight";
 export {
   AutoApproveButton,
-  BartActions,
-  BartBody,
-  BartHeader,
-  BartInput,
-  BartMessages,
-  BartTitle,
+  AgentActions,
+  AgentBody,
+  AgentHeader,
+  AgentInput,
+  AgentMessages,
+  AgentTitle,
   CloseButton,
   NewChatButton,
 } from "./components/chat-parts";
-export { BartSelectionPopover } from "./components/selection-popover";
+export { AgentSelectionPopover } from "./components/selection-popover";
 export {
   appendSelection,
   buildQuotedMessage,
@@ -36,16 +36,18 @@ export {
   MAX_SELECTION_ITEMS,
 } from "./core/selection";
 export {
-  isBartToolName,
-  useBartChat,
-  type BartToolName,
-  type UseBartChatOptions,
-  type UseBartChatReturn,
-} from "./core/use-bart-chat";
+  isAgentToolName,
+  useAgentChat,
+  type AgentReplayAction,
+  type AgentReplayResult,
+  type AgentToolName,
+  type UseAgentChatOptions,
+  type UseAgentChatReturn,
+} from "./core/use-agent-chat";
 export { dismissHighlight, runHighlight } from "./core/highlight";
 export { runInteract } from "./core/interact";
 export { shouldTriggerShortcut, type ShortcutEventLike } from "./core/shortcut";
-export type { BartSide } from "./core/resize";
+export type { AgentSide } from "./core/resize";
 export {
   DEFAULT_TOOL_POLICIES,
   resolveToolPolicies,
@@ -54,17 +56,18 @@ export {
   validateTarget,
 } from "./core/tool-policy";
 export type {
-  BartAppearance,
-  BartHighlightOptions,
-  BartPublicManifest,
-  BartRoute,
-  BartStarterPrompt,
-  BartTarget,
-  BartToolOutput,
-  BartToolPolicies,
-  BartTools,
-  BartUIMessage,
-  BartVariant,
+  AgentAppearance,
+  AgentHighlightOptions,
+  AgentPublicManifest,
+  AgentRoute,
+  AgentSelectionSide,
+  AgentStarterPrompt,
+  AgentTarget,
+  AgentToolOutput,
+  AgentToolPolicies,
+  AgentTools,
+  AgentUIMessage,
+  AgentVariant,
   HighlightInput,
   InteractInput,
   NavigateInput,

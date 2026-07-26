@@ -2,14 +2,15 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState, type ReactNode } from "react";
 import type {
-  BartAppearance,
-  BartPublicManifest,
-  BartVariant,
+  AgentAppearance,
+  AgentPublicManifest,
+  AgentToolPolicies,
+  AgentVariant,
 } from "../core/types";
-import { BartProvider } from "./bart-provider";
-import { BartDock } from "./dock";
-import { BartSidebar } from "./sidebar";
-import { BartSpotlight } from "./spotlight";
+import { AgentProvider } from "./agent-provider";
+import { AgentDock } from "./dock";
+import { AgentSidebar } from "./sidebar";
+import { AgentSpotlight } from "./spotlight";
 
 /**
  * Contract suite: the behavior every variant must expose, run against all
@@ -18,7 +19,7 @@ import { BartSpotlight } from "./spotlight";
  * what has focus, what got sent), never implementation details.
  */
 
-const manifest: BartPublicManifest = {
+const manifest: AgentPublicManifest = {
   routes: [
     {
       route: "/",
@@ -95,6 +96,20 @@ const toolCallReply = (toolName: string, input: object) => () =>
     { type: "finish" },
   );
 
+const multiToolCallReply = (
+  ...calls: Array<{ toolName: string; input: object }>
+) => () =>
+  sse(
+    { type: "start" },
+    ...calls.map(({ toolName, input }, index) => ({
+      type: "tool-input-available",
+      toolCallId: `call-${index + 1}`,
+      toolName,
+      input,
+    })),
+    { type: "finish" },
+  );
+
 // ---------- harness ----------
 
 function Host({
@@ -106,27 +121,30 @@ function Host({
   header,
   inputSeparator,
   starterPrompts,
+  toolPolicy,
 }: {
-  variant: BartVariant;
+  variant: AgentVariant;
   onNavigate?: (route: string) => void;
   /** Click handler for the page's own interactive target element. */
   onPageButtonClick?: () => void;
-  appearance?: BartAppearance;
+  appearance?: AgentAppearance;
   icon?: ReactNode;
   header?: ReactNode;
   inputSeparator?: boolean;
   starterPrompts?: readonly { label: string; prompt: string }[];
+  toolPolicy?: Partial<AgentToolPolicies>;
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <BartProvider
-      api="/api/bart"
+    <AgentProvider
+      api="/api/agent"
       currentRoute="/"
       navigate={onNavigate}
       manifest={manifest}
       appearance={appearance}
       icon={icon}
       starterPrompts={starterPrompts}
+      toolPolicy={toolPolicy}
       open={open}
       onOpenChange={setOpen}
     >
@@ -138,24 +156,24 @@ function Host({
       </button>
       <button
         type="button"
-        data-bart-target="order-button"
+        data-agent-target="order-button"
         onClick={onPageButtonClick}
       >
         page-order-button
       </button>
       {variant === "dock" && (
-        <BartDock header={header} inputSeparator={inputSeparator} />
+        <AgentDock header={header} inputSeparator={inputSeparator} />
       )}
       {variant === "sidebar" && (
-        <BartSidebar header={header} inputSeparator={inputSeparator} />
+        <AgentSidebar header={header} inputSeparator={inputSeparator} />
       )}
-      {variant === "spotlight" && <BartSpotlight />}
-    </BartProvider>
+      {variant === "spotlight" && <AgentSpotlight />}
+    </AgentProvider>
   );
 }
 
 interface VariantDriver {
-  variant: BartVariant;
+  variant: AgentVariant;
   /** Perform the variant's own open gesture (launcher click / shortcut). */
   openGesture: () => void;
   /** Perform the variant's own pointer close gesture. */
@@ -168,7 +186,7 @@ const drivers: VariantDriver[] = [
   {
     variant: "dock",
     openGesture: () =>
-      fireEvent.click(screen.getByRole("button", { name: "Bart" })),
+      fireEvent.click(screen.getByRole("button", { name: "Agent" })),
     pointerClose: () =>
       fireEvent.click(screen.getByRole("button", { name: "Close chat" })),
     restoresToLauncher: true,
@@ -176,7 +194,7 @@ const drivers: VariantDriver[] = [
   {
     variant: "sidebar",
     openGesture: () =>
-      fireEvent.click(screen.getByRole("button", { name: "Bart" })),
+      fireEvent.click(screen.getByRole("button", { name: "Agent" })),
     pointerClose: () =>
       fireEvent.click(screen.getByRole("button", { name: "Close chat" })),
     restoresToLauncher: true,
@@ -185,7 +203,7 @@ const drivers: VariantDriver[] = [
     variant: "spotlight",
     openGesture: () => fireEvent.keyDown(document.body, { key: "/" }),
     pointerClose: () => {
-      const backdrop = document.querySelector(".bart-spotlight-backdrop");
+      const backdrop = document.querySelector(".agent-spotlight-backdrop");
       if (!backdrop) throw new Error("spotlight backdrop not rendered");
       fireEvent.click(backdrop);
     },
@@ -211,7 +229,7 @@ async function openPanel(driver: VariantDriver) {
 }
 
 async function sendMessage(text: string) {
-  const input = screen.getByRole("textbox", { name: "Message Bart" });
+  const input = screen.getByRole("textbox", { name: "Message Agent" });
   fireEvent.change(input, { target: { value: text } });
   fireEvent.click(screen.getByRole("button", { name: "Send message" }));
 }
@@ -224,7 +242,7 @@ for (const driver of drivers) {
       render(<Host variant={driver.variant} />);
       expect(queryPanel()).toBeNull();
       await openPanel(driver);
-      expect(getPanel().getAttribute("aria-label")).toBe("Bart assistant");
+      expect(getPanel().getAttribute("aria-label")).toBe("Agent assistant");
     });
 
     test("Escape closes and the panel unmounts after its exit animation", async () => {
@@ -258,7 +276,7 @@ for (const driver of drivers) {
         pressEscape();
         endExitAnimation();
         await waitFor(() => expect(queryPanel()).toBeNull());
-        const launcher = screen.getByRole("button", { name: "Bart" });
+        const launcher = screen.getByRole("button", { name: "Agent" });
         await waitFor(() => expect(document.activeElement).toBe(launcher));
       } else {
         // The spotlight has no launcher: it returns focus to whatever held it
@@ -327,10 +345,10 @@ for (const driver of drivers) {
       render(<Host variant={driver.variant} onNavigate={(r) => seen.push(r)} />);
       await openPanel(driver);
       await sendMessage("take me to the FAQ");
-      await screen.findByText("Bart wants to navigate to /faq");
+      await screen.findByText("Agent wants to navigate to /faq");
       fireEvent.click(screen.getByRole("button", { name: "Deny" }));
       await waitFor(() =>
-        expect(screen.queryByText("Bart wants to navigate to /faq")).toBeNull(),
+        expect(screen.queryByText("Agent wants to navigate to /faq")).toBeNull(),
       );
       await screen.findByText("You denied navigation to /faq");
       expect(seen).toEqual([]);
@@ -344,7 +362,7 @@ for (const driver of drivers) {
       render(<Host variant={driver.variant} onNavigate={(r) => seen.push(r)} />);
       await openPanel(driver);
       await sendMessage("take me to the FAQ");
-      await screen.findByText("Bart wants to navigate to /faq");
+      await screen.findByText("Agent wants to navigate to /faq");
       fireEvent.click(screen.getByRole("button", { name: "Allow" }));
       await screen.findByText("You approved navigation to /faq");
       expect(seen).toEqual(["/faq"]);
@@ -365,12 +383,21 @@ for (const driver of drivers) {
       );
       await openPanel(driver);
       await sendMessage("start my order");
-      await screen.findByText("Bart wants to click “order-button”");
+      await screen.findByText("Agent wants to click “order-button”");
       expect(pageClicks).toBe(0);
       fireEvent.click(screen.getByRole("button", { name: "Allow" }));
       await screen.findByText("You approved clicking “order-button”");
       expect(pageClicks).toBe(1);
       await screen.findByText("Your order is started.");
+      const actionGroup = screen.getByRole("region", {
+        name: "Agent actions",
+      });
+      expect(actionGroup).toBeTruthy();
+      const replay = screen.getByRole("button", { name: "Replay actions" });
+      fireEvent.click(replay);
+      fireEvent.click(replay);
+      await waitFor(() => expect(pageClicks).toBe(2));
+      await screen.findByText("Replayed: Clicked “order-button”");
     });
 
     test("the auto-approve toggle executes navigation without an approval card", async () => {
@@ -380,7 +407,7 @@ for (const driver of drivers) {
       render(<Host variant={driver.variant} onNavigate={(r) => seen.push(r)} />);
       await openPanel(driver);
       const toggle = screen.getByRole("switch", {
-        name: "Automatically approve Bart's page actions",
+        name: "Automatically approve Agent's page actions",
       });
       expect(toggle.getAttribute("aria-checked")).toBe("false");
       fireEvent.click(toggle);
@@ -397,13 +424,13 @@ for (const driver of drivers) {
     test("renders the solid surface by default and glass on opt-in", async () => {
       const view = render(<Host variant={driver.variant} />);
       await openPanel(driver);
-      expect(document.querySelector(".bart-glass")).toBeNull();
-      expect(document.querySelector(".bart-solid")).toBeTruthy();
+      expect(document.querySelector(".agent-glass")).toBeNull();
+      expect(document.querySelector(".agent-solid")).toBeTruthy();
       view.unmount();
       render(<Host variant={driver.variant} appearance="glass" />);
       await openPanel(driver);
-      expect(document.querySelector(".bart-solid")).toBeNull();
-      expect(document.querySelector(".bart-glass")).toBeTruthy();
+      expect(document.querySelector(".agent-solid")).toBeNull();
+      expect(document.querySelector(".agent-glass")).toBeTruthy();
     });
 
     test("a custom icon node replaces the brand mark", async () => {
@@ -446,7 +473,7 @@ for (const driver of drivers.slice(0, 2)) {
   describe(`${driver.variant} header/separator configuration`, () => {
     test("header={false} removes the standard header", async () => {
       render(<Host variant={driver.variant} header={false} />);
-      fireEvent.click(screen.getByRole("button", { name: "Bart" }));
+      fireEvent.click(screen.getByRole("button", { name: "Agent" }));
       await waitFor(() => expect(getPanel()).toBeTruthy());
       expect(screen.queryByRole("button", { name: "Close chat" })).toBeNull();
       // Escape still closes: the lifecycle hook, not the header, owns it.
@@ -462,7 +489,7 @@ for (const driver of drivers.slice(0, 2)) {
           header={<header data-testid="my-header">Custom</header>}
         />,
       );
-      fireEvent.click(screen.getByRole("button", { name: "Bart" }));
+      fireEvent.click(screen.getByRole("button", { name: "Agent" }));
       await waitFor(() => expect(getPanel()).toBeTruthy());
       expect(screen.getByTestId("my-header").textContent).toBe("Custom");
       expect(screen.queryByRole("button", { name: "Close chat" })).toBeNull();
@@ -471,7 +498,7 @@ for (const driver of drivers.slice(0, 2)) {
     test("inputSeparator={false} marks the panel as separator-free", async () => {
       render(<Host variant={driver.variant} inputSeparator={false} />);
       await openPanel(driver);
-      expect(getPanel().className).toContain("bart-no-separator");
+      expect(getPanel().className).toContain("agent-no-separator");
     });
   });
 }
@@ -481,12 +508,68 @@ describe("dock specifics", () => {
     render(<Host variant="dock" />);
     await openPanel(drivers[0]!);
     const panel = getPanel();
-    expect(panel.style.width).toBe("384px");
+    const frame = document.querySelector<HTMLElement>(
+      '[data-agent-ui="dock-frame"]',
+    );
+    if (!frame) throw new Error("dock frame not rendered");
+    expect(frame.style.width).toBe("384px");
     const handle = screen.getByRole("button", { name: "Resize chat panel" });
     fireEvent.keyDown(handle, { key: "ArrowLeft" });
-    expect(panel.style.width).toBe("400px");
+    expect(frame.style.width).toBe("400px");
     fireEvent.keyDown(handle, { key: "ArrowUp", shiftKey: true });
-    expect(panel.style.height).toBe("480px");
+    expect(frame.style.height).toBe("480px");
+    expect(panel.style.width).toBe("");
+  });
+
+  test("groups a series of actions and replays every successful action locally", async () => {
+    fetchQueue.push(
+      multiToolCallReply(
+        { toolName: "highlight", input: { target: "order-button" } },
+        { toolName: "highlight", input: { target: "order-button" } },
+      ),
+    );
+    fetchQueue.push(textReply("Both actions are complete."));
+    render(<Host variant="dock" />);
+    await openPanel(drivers[0]!);
+    await sendMessage("highlight the order button twice");
+    await screen.findByText("Both actions are complete.");
+
+    expect(
+      screen.getAllByRole("region", { name: "Agent actions" }),
+    ).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Replay actions" }));
+    await waitFor(() =>
+      expect(screen.getAllByText("Replayed: Highlighted “order-button”")).toHaveLength(
+        2,
+      ),
+    );
+  });
+
+  test("replay re-checks a policy that was disabled after the original action", async () => {
+    function PolicyHarness() {
+      const [disabled, setDisabled] = useState(false);
+      return (
+        <>
+          <button type="button" onClick={() => setDisabled(true)}>
+            disable-highlight
+          </button>
+          <Host
+            variant="dock"
+            toolPolicy={{ highlight: disabled ? "disabled" : "auto" }}
+          />
+        </>
+      );
+    }
+
+    fetchQueue.push(toolCallReply("highlight", { target: "order-button" }));
+    fetchQueue.push(textReply("Highlighted."));
+    render(<PolicyHarness />);
+    await openPanel(drivers[0]!);
+    await sendMessage("highlight the order button");
+    await screen.findByText("Highlighted.");
+    fireEvent.click(screen.getByRole("button", { name: "disable-highlight" }));
+    fireEvent.click(screen.getByRole("button", { name: "Replay actions" }));
+    await screen.findByText(/disabled-by-policy/);
   });
 });
 
@@ -496,20 +579,20 @@ describe("sidebar specifics", () => {
   test("open pushes the page via body classes; close and unmount clean them up", async () => {
     const view = render(<Host variant="sidebar" />);
     await openPanel(driver);
-    expect(document.body.classList.contains("bart-sidebar-push")).toBe(true);
-    expect(document.body.classList.contains("bart-sidebar-push-right")).toBe(
+    expect(document.body.classList.contains("agent-sidebar-push")).toBe(true);
+    expect(document.body.classList.contains("agent-sidebar-push-right")).toBe(
       true,
     );
     pressEscape();
     endExitAnimation();
     await waitFor(() => expect(queryPanel()).toBeNull());
-    expect(document.body.classList.contains("bart-sidebar-push-right")).toBe(
+    expect(document.body.classList.contains("agent-sidebar-push-right")).toBe(
       false,
     );
     view.unmount();
-    expect(document.body.classList.contains("bart-sidebar-push")).toBe(false);
+    expect(document.body.classList.contains("agent-sidebar-push")).toBe(false);
     expect(
-      document.documentElement.style.getPropertyValue("--bart-sidebar-width"),
+      document.documentElement.style.getPropertyValue("--agent-sidebar-width"),
     ).toBe("");
   });
 
@@ -520,7 +603,7 @@ describe("sidebar specifics", () => {
     fireEvent.keyDown(handle, { key: "ArrowLeft" });
     // happy-dom reports zero layout width, so the clamp floor is the result.
     expect(
-      document.documentElement.style.getPropertyValue("--bart-sidebar-width"),
+      document.documentElement.style.getPropertyValue("--agent-sidebar-width"),
     ).toBe("280px");
   });
 });
@@ -531,7 +614,7 @@ describe("spotlight specifics", () => {
   test("clicking inside the card does not close it", async () => {
     render(<Host variant="spotlight" />);
     await openPanel(driver);
-    fireEvent.click(screen.getByRole("textbox", { name: "Message Bart" }));
+    fireEvent.click(screen.getByRole("textbox", { name: "Message Agent" }));
     expect(getPanel()).toBeTruthy();
   });
 

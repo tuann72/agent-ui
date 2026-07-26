@@ -10,14 +10,19 @@ import {
 } from "react";
 import { getToolName, isToolUIPart, type ToolUIPart } from "ai";
 import { motionDisabled } from "../core/motion";
-import { isBartToolName, type BartToolName } from "../core/use-bart-chat";
+import {
+  isAgentToolName,
+  type AgentReplayAction,
+  type AgentReplayResult,
+  type AgentToolName,
+} from "../core/use-agent-chat";
 import type {
-  BartAppearance,
-  BartToolOutput,
-  BartTools,
-  BartUIMessage,
+  AgentAppearance,
+  AgentToolOutput,
+  AgentTools,
+  AgentUIMessage,
 } from "../core/types";
-import { BartShellProvider, useBartContext, useCloseBart } from "./bart-provider";
+import { AgentShellProvider, useAgentContext, useCloseAgent } from "./agent-provider";
 import {
   CheckIcon,
   CloseIcon,
@@ -27,11 +32,49 @@ import {
 } from "./icons";
 import { MarkdownContent } from "./markdown";
 
-type BartToolPart = ToolUIPart<BartTools>;
+type AgentToolPart = ToolUIPart<AgentTools>;
+type AgentMessagePart = AgentUIMessage["parts"][number];
+
+interface GroupedMessagePart {
+  kind: "part";
+  part: AgentMessagePart;
+  index: number;
+}
+
+interface GroupedToolRun {
+  kind: "tools";
+  parts: AgentToolPart[];
+}
+
+type GroupedMessageItem = GroupedMessagePart | GroupedToolRun;
+
+/** Preserve transcript order while wrapping each contiguous tool run once. */
+export function groupAgentMessageParts(
+  parts: AgentUIMessage["parts"],
+): GroupedMessageItem[] {
+  const grouped: GroupedMessageItem[] = [];
+  let toolRun: AgentToolPart[] = [];
+  const flushTools = () => {
+    if (toolRun.length === 0) return;
+    grouped.push({ kind: "tools", parts: toolRun });
+    toolRun = [];
+  };
+
+  parts.forEach((part, index) => {
+    if (isToolUIPart<AgentTools>(part)) {
+      toolRun.push(part);
+      return;
+    }
+    flushTools();
+    grouped.push({ kind: "part", part, index });
+  });
+  flushTools();
+  return grouped;
+}
 
 /** The surface-finish class every shell places on its panel(s). */
-export function surfaceClass(appearance: BartAppearance = "default"): string {
-  return appearance === "glass" ? "bart-glass" : "bart-solid";
+export function surfaceClass(appearance: AgentAppearance = "default"): string {
+  return appearance === "glass" ? "agent-glass" : "agent-solid";
 }
 
 /**
@@ -67,11 +110,11 @@ function ThinkingIndicator() {
   }, []);
 
   return (
-    <div className="bart-typing" role="status" aria-label="Bart is thinking">
-      <span className="bart-typing-label" aria-hidden="true">
+    <div className="agent-typing" role="status" aria-label="Agent is thinking">
+      <span className="agent-typing-label" aria-hidden="true">
         {THINKING_WORDS[wordIndex]}
       </span>
-      <span className="bart-typing-dots" aria-hidden="true">
+      <span className="agent-typing-dots" aria-hidden="true">
         <span />
         <span />
         <span />
@@ -81,11 +124,11 @@ function ThinkingIndicator() {
 }
 
 /** Natural-language phrasing for each tool, keyed by lifecycle moment. */
-function toolPhrases(name: BartToolName, input: unknown) {
+function toolPhrases(name: AgentToolName, input: unknown) {
   if (name === "navigate") {
     const route = (input as { route?: string } | undefined)?.route ?? "…";
     return {
-      question: `Bart wants to navigate to ${route}`,
+      question: `Agent wants to navigate to ${route}`,
       progress: `Navigating to ${route}`,
       approved: `You approved navigation to ${route}`,
       done: `Navigated to ${route}`,
@@ -97,7 +140,7 @@ function toolPhrases(name: BartToolName, input: unknown) {
   const verb = name === "interact" ? "click" : "highlight";
   const capitalized = verb.charAt(0).toUpperCase() + verb.slice(1);
   return {
-    question: `Bart wants to ${verb} “${target}”`,
+    question: `Agent wants to ${verb} “${target}”`,
     progress: `${capitalized}ing “${target}”`,
     approved: `You approved ${verb}ing “${target}”`,
     done: `${capitalized}ed “${target}”`,
@@ -106,33 +149,33 @@ function toolPhrases(name: BartToolName, input: unknown) {
   };
 }
 
-function ToolPartView({ part }: { part: BartToolPart }) {
-  const { bart } = useBartContext();
+function ToolPartView({ part }: { part: AgentToolPart }) {
+  const { agent } = useAgentContext();
   const toolName = getToolName(part);
   // A tool this build doesn't know renders as an inert row: no approval card,
   // no policy lookup, nothing executable.
-  if (!isBartToolName(toolName)) {
+  if (!isAgentToolName(toolName)) {
     return (
-      <div className="bart-tool-row bart-muted">{String(toolName)} (unsupported)</div>
+      <div className="agent-tool-row agent-muted">{String(toolName)} (unsupported)</div>
     );
   }
   const phrases = toolPhrases(toolName, part.input);
 
   if (part.state === "input-streaming") {
-    return <div className="bart-tool-row bart-muted">{phrases.progress}…</div>;
+    return <div className="agent-tool-row agent-muted">{phrases.progress}…</div>;
   }
 
   if (part.state === "input-available") {
-    if (bart.policies[toolName] === "confirm") {
+    if (agent.policies[toolName] === "confirm") {
       return (
-        <div className="bart-tool-card">
-          <p className="bart-tool-question">{phrases.question}</p>
-          <div className="bart-tool-actions">
+        <div className="agent-tool-card">
+          <p className="agent-tool-question">{phrases.question}</p>
+          <div className="agent-tool-actions">
             <button
               type="button"
-              className="bart-btn-primary"
+              className="agent-btn-primary"
               onClick={() =>
-                bart.respondToToolCall({
+                agent.respondToToolCall({
                   toolName,
                   toolCallId: part.toolCallId,
                   input: part.input,
@@ -144,9 +187,9 @@ function ToolPartView({ part }: { part: BartToolPart }) {
             </button>
             <button
               type="button"
-              className="bart-btn-ghost"
+              className="agent-btn-ghost"
               onClick={() =>
-                bart.respondToToolCall({
+                agent.respondToToolCall({
                   toolName,
                   toolCallId: part.toolCallId,
                   input: part.input,
@@ -160,20 +203,20 @@ function ToolPartView({ part }: { part: BartToolPart }) {
         </div>
       );
     }
-    return <div className="bart-tool-row bart-muted">{phrases.progress}…</div>;
+    return <div className="agent-tool-row agent-muted">{phrases.progress}…</div>;
   }
 
   if (part.state === "output-available") {
-    const output = part.output as BartToolOutput;
+    const output = part.output as AgentToolOutput;
     if (output.ok) {
       return (
-        <div className="bart-tool-row">
+        <div className="agent-tool-row">
           <CheckIcon /> {output.approvedByUser ? phrases.approved : phrases.done}
         </div>
       );
     }
     return (
-      <div className="bart-tool-row">
+      <div className="agent-tool-row">
         <CloseIcon size={12} />{" "}
         {output.reason === "denied-by-user"
           ? phrases.denied
@@ -183,14 +226,100 @@ function ToolPartView({ part }: { part: BartToolPart }) {
   }
 
   return (
-    <div className="bart-tool-row">
+    <div className="agent-tool-row">
       <CloseIcon size={12} /> {phrases.failed} — {part.errorText}
     </div>
   );
 }
 
+function replayableAction(part: AgentToolPart): AgentReplayAction | null {
+  const toolName = getToolName(part);
+  if (
+    !isAgentToolName(toolName) ||
+    part.state !== "output-available" ||
+    !(part.output as AgentToolOutput).ok
+  ) {
+    return null;
+  }
+  return { toolName, input: part.input };
+}
+
+function replayResultText(result: AgentReplayResult): string {
+  if (result.skipped) {
+    return result.output.reason === "replay-limit-reached"
+      ? "Skipped: replay limit reached"
+      : "Skipped after an earlier action failed";
+  }
+  const phrases = toolPhrases(result.action.toolName, result.action.input);
+  if (result.output.ok) return `Replayed: ${phrases.done}`;
+  return `Replay stopped: ${phrases.failed} — ${result.output.reason ?? "failed"}`;
+}
+
+function AgentActionGroup({ parts }: { parts: AgentToolPart[] }) {
+  const { agent } = useAgentContext();
+  const [replaying, setReplaying] = useState(false);
+  const [replayResults, setReplayResults] = useState<
+    readonly AgentReplayResult[]
+  >([]);
+  const terminal = parts.every(
+    (part) =>
+      part.state !== "input-streaming" && part.state !== "input-available",
+  );
+  const actions = parts
+    .map(replayableAction)
+    .filter((action): action is AgentReplayAction => action !== null);
+
+  const replay = async () => {
+    if (replaying || actions.length === 0) return;
+    setReplaying(true);
+    setReplayResults([]);
+    try {
+      setReplayResults(await agent.replayActions(actions));
+    } finally {
+      setReplaying(false);
+    }
+  };
+
+  return (
+    <section className="agent-action-group" aria-label="Agent actions">
+      <div className="agent-action-group-heading">Actions</div>
+      <div className="agent-action-group-list">
+        {parts.map((part) => (
+          <ToolPartView key={part.toolCallId} part={part} />
+        ))}
+      </div>
+      {replayResults.length > 0 && (
+        <div className="agent-replay-results" aria-live="polite">
+          {replayResults.map((result, index) => (
+            <div
+              className="agent-tool-row"
+              key={`${result.action.toolName}:${index}`}
+            >
+              {result.output.ok ? <CheckIcon /> : <CloseIcon size={12} />}
+              {replayResultText(result)}
+            </div>
+          ))}
+        </div>
+      )}
+      {terminal && actions.length > 0 && (
+        <div className="agent-action-group-footer">
+          <button
+            type="button"
+            className="agent-btn-ghost agent-replay-button"
+            disabled={replaying}
+            onClick={() => void replay()}
+          >
+            <RefreshIcon size={12} />
+            {replaying ? "Replaying…" : "Replay actions"}
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
 // ---------- composable parts (context-driven) ----------
-// These read the shared state from `useBartContext`, so a consumer can drop
+// These read the shared state from `useAgentContext`, so a consumer can drop
 // them anywhere inside a shell and rearrange them without prop drilling. The
 // dock/sidebar default header is just the standard arrangement of them.
 
@@ -199,17 +328,17 @@ function ToolPartView({ part }: { part: BartToolPart }) {
  * `messages` to render a filtered view (the spotlight shows only the latest
  * exchange), and `emptyState` for your own before-first-message copy.
  */
-export function BartMessages({
+export function AgentMessages({
   messages: messagesProp,
   className = "",
   emptyState,
 }: {
-  messages?: BartUIMessage[];
+  messages?: AgentUIMessage[];
   className?: string;
   emptyState?: ReactNode;
 }) {
-  const { bart, starterPrompts } = useBartContext();
-  const messages = messagesProp ?? bart.messages;
+  const { agent, starterPrompts } = useAgentContext();
+  const messages = messagesProp ?? agent.messages;
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastMessage = messages.at(-1);
   const assistantHasVisibleOutput =
@@ -217,11 +346,11 @@ export function BartMessages({
     lastMessage.parts.some(
       (part) =>
         (part.type === "text" && part.text.trim().length > 0) ||
-        isToolUIPart<BartTools>(part),
+        isToolUIPart<AgentTools>(part),
     );
   const showThinking =
-    bart.status === "submitted" ||
-    (bart.status === "streaming" && !assistantHasVisibleOutput);
+    agent.status === "submitted" ||
+    (agent.status === "streaming" && !assistantHasVisibleOutput);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -231,25 +360,25 @@ export function BartMessages({
   return (
     <div
       ref={scrollRef}
-      className={`bart-message-list ${className}`}
+      className={`agent-message-list ${className}`}
       aria-live="polite"
     >
       {messages.length === 0 && (
-        <div className="bart-empty-hint">
+        <div className="agent-empty-hint">
           {emptyState ?? (
-            <p className="bart-muted">
+            <p className="agent-muted">
               Ask about this site, highlight something on the page, or navigate
               to another section.
             </p>
           )}
           {starterPrompts.length > 0 && (
-            <div className="bart-starter-prompts" aria-label="Suggested tasks">
+            <div className="agent-starter-prompts" aria-label="Suggested tasks">
               {starterPrompts.map(({ label, prompt }) => (
                 <button
                   key={`${label}:${prompt}`}
                   type="button"
-                  className="bart-btn-ghost"
-                  onClick={() => bart.sendText(prompt)}
+                  className="agent-btn-ghost"
+                  onClick={() => agent.sendText(prompt)}
                 >
                   {label}
                 </button>
@@ -262,27 +391,33 @@ export function BartMessages({
         <div
           key={message.id}
           className={
-            message.role === "user" ? "bart-msg-user" : "bart-msg-assistant"
+            message.role === "user" ? "agent-msg-user" : "agent-msg-assistant"
           }
         >
-          {message.parts.map((part, i) => {
-            if (part.type === "text") {
+          {groupAgentMessageParts(message.parts).map((item) => {
+            if (item.kind === "tools") {
               return (
-                <MarkdownContent key={i}>{part.text}</MarkdownContent>
+                <AgentActionGroup
+                  key={`tools:${item.parts[0]?.toolCallId ?? "empty"}`}
+                  parts={item.parts}
+                />
               );
             }
-            if (isToolUIPart<BartTools>(part)) {
-              return <ToolPartView key={part.toolCallId} part={part} />;
+            const { part, index } = item;
+            if (part.type === "text") {
+              return (
+                <MarkdownContent key={index}>{part.text}</MarkdownContent>
+              );
             }
             return null;
           })}
         </div>
       ))}
       {showThinking && <ThinkingIndicator />}
-      {bart.error && (
-        <div className="bart-error" role="alert">
-          <p>Something went wrong: {bart.error.message}</p>
-          <button type="button" className="bart-btn-ghost" onClick={bart.clearError}>
+      {agent.error && (
+        <div className="agent-error" role="alert">
+          <p>Something went wrong: {agent.error.message}</p>
+          <button type="button" className="agent-btn-ghost" onClick={agent.clearError}>
             Dismiss
           </button>
         </div>
@@ -292,8 +427,8 @@ export function BartMessages({
 }
 
 /** The message composer, bound to the shared chat state. */
-export function BartInput({
-  placeholder = "Ask Bart…",
+export function AgentInput({
+  placeholder = "Ask Agent…",
   autoFocus = false,
   className = "",
 }: {
@@ -301,34 +436,43 @@ export function BartInput({
   autoFocus?: boolean;
   className?: string;
 }) {
-  const { bart } = useBartContext();
+  const { agent } = useAgentContext();
   const [value, setValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-  const busy = bart.status === "submitted" || bart.status === "streaming";
+  const busy = agent.status === "submitted" || agent.status === "streaming";
 
   useEffect(() => {
-    if (bart.pendingQuotes.length > 0) inputRef.current?.focus();
-  }, [bart.pendingQuotes.length]);
+    if (agent.pendingQuotes.length > 0) inputRef.current?.focus();
+  }, [agent.pendingQuotes.length]);
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
     if (busy) return;
-    bart.sendText(value);
+    agent.sendText(value);
     setValue("");
   };
 
   return (
-    <form className={`bart-input-area ${className}`} onSubmit={onSubmit}>
-      {bart.pendingQuotes.length > 0 && (
-        <div className="bart-quote-list" aria-label="Selected text to ask about">
-          {bart.pendingQuotes.map((quote, index) => (
-            <div className="bart-quote-chip" key={quote} title={quote}>
-              <span className="bart-quote-chip-text">“{quote}”</span>
+    <form className={`agent-input-area ${className}`} onSubmit={onSubmit}>
+      {agent.pendingQuotes.length > 0 && (
+        <div
+          className="agent-quote-list"
+          role="list"
+          aria-label="Selected text to ask about"
+        >
+          {agent.pendingQuotes.map((quote, index) => (
+            <div
+              className="agent-quote-chip"
+              role="listitem"
+              key={quote}
+              title={quote}
+            >
+              <span className="agent-quote-chip-text">“{quote}”</span>
               <button
                 type="button"
-                className="bart-icon-btn bart-quote-chip-dismiss"
+                className="agent-icon-btn agent-quote-chip-dismiss"
                 aria-label={`Remove selected text ${index + 1}`}
-                onClick={() => bart.removeQuote(index)}
+                onClick={() => agent.removeQuote(index)}
               >
                 <CloseIcon size={12} />
               </button>
@@ -336,35 +480,35 @@ export function BartInput({
           ))}
         </div>
       )}
-      <div className="bart-input-row">
-        <div className="bart-input-shell">
+      <div className="agent-input-row">
+        <div className="agent-input-shell">
           <input
             ref={inputRef}
-            className="bart-input"
+            className="agent-input"
             value={value}
             onChange={(e) => setValue(e.target.value)}
             placeholder={
-              bart.pendingQuotes.length > 0
+              agent.pendingQuotes.length > 0
                 ? "Ask about the selected text…"
                 : placeholder
             }
-            aria-label="Message Bart"
+            aria-label="Message Agent"
             autoFocus={autoFocus}
           />
           {busy ? (
             <button
               type="button"
-              className="bart-send-btn"
+              className="agent-send-btn"
               aria-label="Stop generating"
               title="Stop"
-              onClick={bart.stop}
+              onClick={agent.stop}
             >
               <StopIcon />
             </button>
           ) : (
             <button
               type="submit"
-              className="bart-send-btn"
+              className="agent-send-btn"
               aria-label="Send message"
               title="Send"
               disabled={value.trim().length === 0}
@@ -379,59 +523,59 @@ export function BartInput({
 }
 
 /**
- * Switch that lets the user skip approval cards for Bart's page actions.
+ * Switch that lets the user skip approval cards for Agent's page actions.
  * Children replace the default check-mark glyph (the spotlight passes a text
  * label); the switch track always renders after them.
  */
 export function AutoApproveButton({ children }: { children?: ReactNode }) {
-  const { bart } = useBartContext();
+  const { agent } = useAgentContext();
   return (
     <button
       type="button"
       role="switch"
-      className="bart-switch"
-      aria-checked={bart.autoApprove}
-      aria-label="Automatically approve Bart's page actions"
+      className="agent-switch"
+      aria-checked={agent.autoApprove}
+      aria-label="Automatically approve Agent's page actions"
       title={
-        bart.autoApprove
-          ? "Auto-approve is on — Bart navigates, highlights, and clicks without asking"
+        agent.autoApprove
+          ? "Auto-approve is on — Agent navigates, highlights, and clicks without asking"
           : "Auto-approve navigation, highlights, and clicks"
       }
-      onClick={() => bart.setAutoApprove(!bart.autoApprove)}
+      onClick={() => agent.setAutoApprove(!agent.autoApprove)}
     >
       {children ?? <CheckIcon size={12} />}
-      <span className="bart-switch-track" aria-hidden="true">
-        <span className="bart-switch-thumb" />
+      <span className="agent-switch-track" aria-hidden="true">
+        <span className="agent-switch-thumb" />
       </span>
     </button>
   );
 }
 
 /** Brand mark + title, from context. */
-export function BartTitle() {
-  const { title, icon } = useBartContext();
+export function AgentTitle() {
+  const { title, icon } = useAgentContext();
   return (
-    <span className="bart-panel-title">
+    <span className="agent-panel-title">
       {icon} {title}
     </span>
   );
 }
 
 /** Right-aligned action group inside the header (holds the action buttons). */
-export function BartActions({ children }: { children?: ReactNode }) {
-  return <div className="bart-panel-actions">{children}</div>;
+export function AgentActions({ children }: { children?: ReactNode }) {
+  return <div className="agent-panel-actions">{children}</div>;
 }
 
 /** Start-a-fresh-conversation button. */
 export function NewChatButton() {
-  const { bart } = useBartContext();
+  const { agent } = useAgentContext();
   return (
     <button
       type="button"
-      className="bart-icon-btn"
+      className="agent-icon-btn"
       aria-label="Start new chat"
       title="Start new chat"
-      onClick={bart.reset}
+      onClick={agent.reset}
     >
       <RefreshIcon />
     </button>
@@ -440,11 +584,11 @@ export function NewChatButton() {
 
 /** Close button; plays the shell's exit animation via the shell context. */
 export function CloseButton() {
-  const close = useCloseBart();
+  const close = useCloseAgent();
   return (
     <button
       type="button"
-      className="bart-icon-btn"
+      className="agent-icon-btn"
       aria-label="Close chat"
       title="Close chat"
       onClick={close}
@@ -457,20 +601,20 @@ export function CloseButton() {
 /**
  * The dock/sidebar title bar. With no children it renders the standard
  * arrangement (brand, auto-approve, new chat, close); pass children to compose
- * your own — group action buttons in a `<BartActions>` for the right-aligned
+ * your own — group action buttons in a `<AgentActions>` for the right-aligned
  * layout.
  */
-export function BartHeader({ children }: { children?: ReactNode }) {
+export function AgentHeader({ children }: { children?: ReactNode }) {
   return (
-    <header className="bart-panel-header">
+    <header className="agent-panel-header">
       {children ?? (
         <>
-          <BartTitle />
-          <BartActions>
+          <AgentTitle />
+          <AgentActions>
             <AutoApproveButton />
             <NewChatButton />
             <CloseButton />
-          </BartActions>
+          </AgentActions>
         </>
       )}
     </header>
@@ -478,11 +622,11 @@ export function BartHeader({ children }: { children?: ReactNode }) {
 }
 
 /** Standard stacked body (messages + input) for the dock and sidebar shells. */
-export function BartBody({ autoFocus = true }: { autoFocus?: boolean }) {
+export function AgentBody({ autoFocus = true }: { autoFocus?: boolean }) {
   return (
-    <div className="bart-panel-body">
-      <BartMessages />
-      <BartInput autoFocus={autoFocus} />
+    <div className="agent-panel-body">
+      <AgentMessages />
+      <AgentInput autoFocus={autoFocus} />
     </div>
   );
 }
@@ -493,7 +637,7 @@ export function BartBody({ autoFocus = true }: { autoFocus?: boolean }) {
  * body. Both stacking shells render through this so they differ only in their
  * frame (resize edges, launcher), never in body composition.
  */
-export function BartPanelContents({
+export function AgentPanelContents({
   close,
   header,
   children,
@@ -503,43 +647,48 @@ export function BartPanelContents({
   children?: ReactNode;
 }) {
   return (
-    <BartShellProvider close={close}>
+    <AgentShellProvider close={close}>
       {children ?? (
         <>
-          {resolveHeader(header, <BartHeader />)}
-          <BartBody />
+          {resolveHeader(header, <AgentHeader />)}
+          <AgentBody />
         </>
       )}
-    </BartShellProvider>
+    </AgentShellProvider>
   );
 }
 
 /**
  * Collapsed-state launcher shared by the dock and sidebar. Owns the open
  * wiring and the accessibility contract (dialog popup, collapsed state); the
- * shells contribute only their frame class, `data-bart-ui` id, and label.
+ * shells contribute only their frame class, `data-agent-ui` id, and label.
  */
 export function LauncherButton({
   launcherRef,
   ui,
   className,
+  onBeforeOpen,
   children,
 }: {
   launcherRef: RefObject<HTMLButtonElement | null>;
   ui: string;
   className: string;
+  onBeforeOpen?: (button: HTMLButtonElement) => void;
   children: ReactNode;
 }) {
-  const { setOpen } = useBartContext();
+  const { setOpen } = useAgentContext();
   return (
     <button
       ref={launcherRef}
       type="button"
-      data-bart-ui={ui}
+      data-agent-ui={ui}
       className={className}
       aria-expanded="false"
       aria-haspopup="dialog"
-      onClick={() => setOpen(true)}
+      onClick={(event) => {
+        onBeforeOpen?.(event.currentTarget);
+        setOpen(true);
+      }}
     >
       {children}
     </button>

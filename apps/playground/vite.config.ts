@@ -1,14 +1,14 @@
-import { toNodeHandler } from "@bart-ui/registry/server/node";
+import { toNodeHandler } from "@agent-ui/registry/server/node";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, type Plugin } from "vite";
 
 const apiModule =
-  process.env.BART_PLAYGROUND_API_MODULE ?? "/server/index.ts";
+  process.env.AGENT_PLAYGROUND_API_MODULE ?? "/server/index.ts";
 
-function bartApi(): Plugin {
+function agentApi(): Plugin {
   return {
-    name: "bart-playground-api",
+    name: "agent-playground-api",
     configureServer(server) {
       server.middlewares.use("/api/health", async (_req, res, next) => {
         try {
@@ -20,7 +20,7 @@ function bartApi(): Plugin {
         }
       });
 
-      server.middlewares.use("/api/bart", async (req, res, next) => {
+      server.middlewares.use("/api/agent", async (req, res, next) => {
         try {
           const module = await server.ssrLoadModule(apiModule);
           if (typeof module.handler !== "function") {
@@ -37,13 +37,13 @@ function bartApi(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss(), bartApi()],
+  plugins: [react(), tailwindcss(), agentApi()],
   resolve: {
     // The registry is a symlinked workspace package importing React itself;
     // dedupe so only one React instance ends up in the bundle.
     dedupe: ["react", "react-dom"],
   },
   optimizeDeps: {
-    exclude: ["@bart-ui/registry"],
+    exclude: ["@agent-ui/registry"],
   },
 });

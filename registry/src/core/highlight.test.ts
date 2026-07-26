@@ -9,17 +9,17 @@ afterEach(() => {
 describe("runHighlight", () => {
   test("highlights registered image and video elements", () => {
     document.body.innerHTML = `
-      <img data-bart-target="photo" alt="Burger">
-      <video data-bart-target="demo"></video>
+      <img data-agent-target="photo" alt="Burger">
+      <video data-agent-target="demo"></video>
     `;
     expect(runHighlight("photo")).toEqual({ ok: true });
-    expect(document.querySelector(".bart-highlight-overlay")).toBeTruthy();
+    expect(document.querySelector(".agent-highlight-overlay")).toBeTruthy();
     dismissHighlight();
     expect(runHighlight("demo")).toEqual({ ok: true });
   });
 
   test("supports SVG targets and consumer-owned visual options", () => {
-    document.body.innerHTML = `<svg data-bart-target="chart"></svg>`;
+    document.body.innerHTML = `<svg data-agent-target="chart"></svg>`;
     expect(
       runHighlight("chart", {
         borderColor: "rebeccapurple",
@@ -32,18 +32,18 @@ describe("runHighlight", () => {
       }),
     ).toEqual({ ok: true });
     const overlay = document.querySelector<HTMLElement>(
-      ".bart-highlight-overlay",
+      ".agent-highlight-overlay",
     )!;
-    expect(overlay.style.getPropertyValue("--bart-highlight-border-color")).toBe(
+    expect(overlay.style.getPropertyValue("--agent-highlight-border-color")).toBe(
       "rebeccapurple",
     );
-    expect(overlay.style.getPropertyValue("--bart-highlight-border-width")).toBe(
+    expect(overlay.style.getPropertyValue("--agent-highlight-border-width")).toBe(
       "4px",
     );
-    expect(overlay.style.getPropertyValue("--bart-highlight-border-style")).toBe(
+    expect(overlay.style.getPropertyValue("--agent-highlight-border-style")).toBe(
       "dashed",
     );
-    expect(overlay.style.getPropertyValue("--bart-highlight-ring-color")).toBe(
+    expect(overlay.style.getPropertyValue("--agent-highlight-ring-color")).toBe(
       "gold",
     );
   });

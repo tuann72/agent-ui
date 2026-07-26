@@ -7,8 +7,8 @@ import type {
 
 /**
  * Scripted mock model: deterministic, offline, no API key. It streams canned
- * text and emits navigate/highlight tool calls on keyword triggers so every
- * client code path (streaming, approvals, tool results) can be exercised.
+ * text and emits navigate/highlight/interact tool calls on keyword triggers so
+ * every client code path (streaming, approvals, tool results) can be exercised.
  *
  * Implemented as a plain LanguageModelV2 rather than `ai/test`'s
  * MockLanguageModelV2 because that entry point drags in test-runner
@@ -26,6 +26,39 @@ function lastUserText(prompt: LanguageModelV2Prompt): string {
   return "";
 }
 
+/**
+ * The `target` of the most recent tool call. Tool *result* parts carry only the
+ * output, so which button was clicked has to come from the assistant turn that
+ * requested it.
+ */
+function lastToolCallTarget(
+  prompt: LanguageModelV2Prompt,
+  toolName: string,
+): string | undefined {
+  for (let i = prompt.length - 1; i >= 0; i -= 1) {
+    const message = prompt[i];
+    if (message?.role !== "assistant") continue;
+    for (const part of message.content) {
+      if (part.type !== "tool-call" || part.toolName !== toolName) continue;
+      const input =
+        typeof part.input === "string" ? safeParse(part.input) : part.input;
+      if (input && typeof input === "object" && "target" in input) {
+        const { target } = input as { target?: unknown };
+        return typeof target === "string" ? target : undefined;
+      }
+    }
+  }
+  return undefined;
+}
+
+function safeParse(json: string): unknown {
+  try {
+    return JSON.parse(json);
+  } catch {
+    return undefined;
+  }
+}
+
 function textParts(text: string): LanguageModelV2StreamPart[] {
   const id = "text-1";
   const deltas = text.split(/(?<=\s)/);
@@ -41,8 +74,9 @@ function textParts(text: string): LanguageModelV2StreamPart[] {
 function toolCallParts(
   toolName: "navigate" | "highlight" | "interact",
   input: object,
+  callId = `call-${toolName}`,
 ): LanguageModelV2StreamPart[] {
-  const id = `call-${toolName}`;
+  const id = callId;
   const inputJson = JSON.stringify(input);
   return [
     { type: "tool-input-start", id, toolName },
@@ -56,16 +90,32 @@ function pickRoute(text: string): string {
   if (
     text.includes("faq") ||
     text.includes("question") ||
-    text.includes("allerg") ||
-    text.includes("dietary")
+    text.includes("waiver") ||
+    text.includes("belay") ||
+    text.includes("kid") ||
+    text.includes("first time") ||
+    text.includes("beginner")
   ) {
     return "/faq";
   }
   if (
+    text.includes("about") ||
+    text.includes("story") ||
+    text.includes("setter") ||
+    text.includes("setting") ||
+    text.includes("reset") ||
+    text.includes("team") ||
+    text.includes("staff")
+  ) {
+    return "/about";
+  }
+  if (
     text.includes("pricing") ||
-    text.includes("menu") ||
     text.includes("price") ||
-    text.includes("combo")
+    text.includes("cost") ||
+    text.includes("membership") ||
+    text.includes("pass") ||
+    text.includes("rental")
   ) {
     return "/pricing";
   }
@@ -74,39 +124,72 @@ function pickRoute(text: string): string {
 }
 
 function pickTarget(text: string): string {
+  if (text.includes("waiver") || text.includes("sign")) return "first-visit-faq";
   if (
-    text.includes("dietary") ||
-    text.includes("vegan") ||
-    text.includes("vegetarian") ||
-    text.includes("gluten") ||
-    text.includes("allerg")
+    text.includes("belay") ||
+    text.includes("certif") ||
+    text.includes("kid") ||
+    text.includes("age") ||
+    text.includes("safety")
   ) {
-    return "dietary-faq";
+    return "safety-faq";
   }
   if (
-    text.includes("faq") ||
-    text.includes("order") ||
-    text.includes("delivery") ||
-    text.includes("reservation")
+    text.includes("freeze") ||
+    text.includes("cancel") ||
+    text.includes("contract") ||
+    text.includes("guest")
   ) {
-    return "ordering-faq";
-  }
-  if (text.includes("combo") || text.includes("side") || text.includes("shake")) {
-    return "combo-deals";
+    return "membership-faq";
   }
   if (
-    text.includes("pricing") ||
+    text.includes("first") ||
+    text.includes("beginner") ||
+    text.includes("bring") ||
+    text.includes("new here")
+  ) {
+    return "first-visit-faq";
+  }
+  if (text.includes("rental") || text.includes("shoe") || text.includes("gear")) {
+    return "gear-rentals";
+  }
+  if (text.includes("day pass") || text.includes("punch") || text.includes("class")) {
+    return "day-passes";
+  }
+  if (
+    text.includes("membership") ||
+    text.includes("monthly") ||
+    text.includes("annual") ||
+    text.includes("plan") ||
     text.includes("price") ||
-    text.includes("menu") ||
-    text.includes("burger")
+    text.includes("pricing")
   ) {
-    return "burger-menu";
+    return "membership-plans";
+  }
+  if (text.includes("setting") || text.includes("setter") || text.includes("reset")) {
+    return "route-setting";
+  }
+  if (text.includes("team") || text.includes("coach") || text.includes("staff")) {
+    return "the-team";
+  }
+  if (text.includes("story") || text.includes("kiln") || text.includes("history")) {
+    return "our-story";
   }
   if (text.includes("hour") || text.includes("location") || text.includes("visit")) {
     return "visit-us";
   }
-  if (text.includes("signature") || text.includes("favorite")) {
-    return "signature-burgers";
+  if (
+    text.includes("wall") ||
+    text.includes("boulder") ||
+    text.includes("rope") ||
+    text.includes("training") ||
+    text.includes("yoga") ||
+    text.includes("discipline")
+  ) {
+    return "disciplines";
+  }
+  if (text.includes("stat") || text.includes("how big") || text.includes("square")) {
+    return "gym-stats";
   }
   return "home-hero";
 }
@@ -131,12 +214,18 @@ function respond(prompt: LanguageModelV2Prompt): {
           ? "click that"
           : "highlight";
     if (value?.ok) {
+      const target =
+        result?.toolName === "interact"
+          ? lastToolCallTarget(prompt, "interact")
+          : undefined;
       return {
         parts: textParts(
           result?.toolName === "navigate"
             ? "Done — you're on the page now. Anything else you want to find?"
             : result?.toolName === "interact"
-              ? "Done — your pickup order is started. It'll be ready in 15–20 minutes."
+              ? target === "sign-waiver"
+                ? "Done — your waiver is signed and good for a year. Bring photo ID on your first visit."
+                : "Done — your membership signup is started. The front desk will confirm your first billing date."
               : "There it is — I've highlighted it on the page for you.",
         ),
         finishReason: "stop",
@@ -166,7 +255,7 @@ function respond(prompt: LanguageModelV2Prompt): {
       const excerpt = quote.length > 80 ? `${quote.slice(0, 80)}…` : quote;
       return {
         parts: textParts(
-          `You selected: “${excerpt}”. That passage is part of the Stackhouse site. This scripted reply confirms the selected text reached the model; switch to a real provider for a contextual answer.`,
+          `You selected: “${excerpt}”. That passage is part of the Basalt Bouldering site. This scripted reply confirms the selected text reached the model; switch to a real provider for a contextual answer.`,
         ),
         finishReason: "stop",
       };
@@ -175,9 +264,42 @@ function respond(prompt: LanguageModelV2Prompt): {
 
   const text = raw.toLowerCase();
 
-  if (/start (a |my |the )?(pickup )?order|place (a |an |my )?order|order pickup/.test(text)) {
+  if (
+    text.includes("highlight") &&
+    text.includes("day passes") &&
+    text.includes("gear rentals")
+  ) {
     return {
-      parts: toolCallParts("interact", { target: "start-order" }),
+      parts: [
+        ...toolCallParts(
+          "highlight",
+          { target: "day-passes" },
+          "call-highlight-day-passes",
+        ),
+        ...toolCallParts(
+          "highlight",
+          { target: "gear-rentals" },
+          "call-highlight-gear-rentals",
+        ),
+      ],
+      finishReason: "tool-calls",
+    };
+  }
+
+  if (/sign (the |my )?waiver|waiver (for me|online)/.test(text)) {
+    return {
+      parts: toolCallParts("interact", { target: "sign-waiver" }),
+      finishReason: "tool-calls",
+    };
+  }
+
+  if (
+    /start (a |my |the )?(membership )?(signup|sign up)|sign (me )?up|join the gym|become a member/.test(
+      text,
+    )
+  ) {
+    return {
+      parts: toolCallParts("interact", { target: "start-membership" }),
       finishReason: "tool-calls",
     };
   }
@@ -202,15 +324,31 @@ function respond(prompt: LanguageModelV2Prompt): {
   }
 
   if (
-    text.includes("vegetarian") ||
-    text.includes("vegan") ||
-    text.includes("gluten") ||
-    text.includes("allerg") ||
-    text.includes("peanut")
+    text.includes("never climbed") ||
+    text.includes("first time") ||
+    text.includes("beginner") ||
+    text.includes("what do i need") ||
+    text.includes("what should i bring")
   ) {
     return {
       parts: textParts(
-        "The **Garden Crunch** is vegetarian and can be made vegan without mayo. Any burger can come in a lettuce wrap, but the kitchen is not certified gluten-free. Fries and rings use refined peanut oil in a shared fryer; tell the cashier about any allergy before ordering.",
+        "You need nothing but clothes you can move in and a water bottle — shoes and chalk rent for **$9** together, or take the **day pass + gear** for $34. Bouldering needs no partner and no certification, so you can start on the V0 walls straight away. Arrive about fifteen minutes early for the waiver and a gear fitting.",
+      ),
+      finishReason: "stop",
+    };
+  }
+
+  if (
+    text.includes("belay") ||
+    text.includes("certif") ||
+    text.includes("kid") ||
+    text.includes("child") ||
+    text.includes("age") ||
+    text.includes("waiver")
+  ) {
+    return {
+      parts: textParts(
+        "A belay certification is only needed for the rope walls — bouldering and the auto-belay lines need none. The class runs Saturdays for **$60**. Kids climb from age five with a guardian on the mats, and the youth team takes climbers from eight. Everyone signs a waiver once a year.",
       ),
       finishReason: "stop",
     };
@@ -219,21 +357,24 @@ function respond(prompt: LanguageModelV2Prompt): {
   if (
     text.includes("price") ||
     text.includes("cost") ||
-    text.includes("menu") ||
-    text.includes("burger") ||
-    text.includes("combo")
+    text.includes("membership") ||
+    text.includes("pass") ||
+    text.includes("rental") ||
+    text.includes("how much")
   ) {
     return {
       parts: textParts(
-        `## Burger prices
+        `## Rates
 
-| Burger | Price |
+| Option | Price |
 | --- | ---: |
-| The Stackhouse | $13 |
-| Smoke Show | $14 |
-| Garden Crunch | $11 |
+| Day pass | $24 |
+| Day pass + gear | $34 |
+| Monthly membership | $79 |
+| Annual membership | $790 |
+| Student & youth | $59 |
 
-Add fries and a fountain drink for **$5**. Say “highlight the burger menu” or “take me to pricing” to see more.`,
+Shoes rent for $6 and chalk for $3. Say “highlight the membership plans” or “take me to pricing” to see the rest.`,
       ),
       finishReason: "stop",
     };
@@ -243,29 +384,48 @@ Add fries and a fountain drink for **$5**. Say “highlight the burger menu” o
     text.includes("hour") ||
     text.includes("open") ||
     text.includes("location") ||
-    text.includes("where")
+    text.includes("where") ||
+    text.includes("address") ||
+    text.includes("parking")
   ) {
     return {
       parts: textParts(
-        `Stackhouse is at **42 Griddle Lane in Chicago's West Loop**, two blocks west of Morgan Station.
+        `Basalt Bouldering Co. is at **118 Kiln Street, Bend, Oregon**, with free parking off Kiln Street and covered bike parking under the loading dock.
 
-- **Mon–Thu:** 11am–10pm
-- **Fri–Sat:** 11am–midnight
-- **Sunday:** 11am–9pm`,
+- **Mon–Fri:** 6am–11pm
+- **Sat–Sun:** 8am–9pm
+- **Staffed intro:** daily at 6pm`,
       ),
       finishReason: "stop",
     };
   }
 
   if (
-    text.includes("pickup") ||
-    text.includes("delivery") ||
-    text.includes("reservation") ||
-    text.includes("order ahead")
+    text.includes("reset") ||
+    text.includes("setting") ||
+    text.includes("setter") ||
+    text.includes("grade") ||
+    text.includes("problem")
   ) {
     return {
       parts: textParts(
-        "Pickup usually takes **15–20 minutes**, and delivery is available within five miles. Stackhouse is walk-in only; parties of eight or more can call ahead for help sitting together.",
+        "One wall is stripped and reset every weeknight — **sixty new problems a week**, and nothing stays up longer than five weeks. Half of every reset is V0–V3, grades are set as ranges rather than single numbers, and tape colors never encode difficulty. Members can forerun a reset from 9pm the night before it opens.",
+      ),
+      finishReason: "stop",
+    };
+  }
+
+  if (
+    text.includes("wall") ||
+    text.includes("boulder") ||
+    text.includes("rope") ||
+    text.includes("lead") ||
+    text.includes("training") ||
+    text.includes("yoga")
+  ) {
+    return {
+      parts: textParts(
+        "There are nine bouldering walls from slab to a 45-degree cave, graded **V0 to V11**, plus 22-foot rope walls with auto-belays on eight lines. The training room has a tension board, three hangboards, rings, and free weights, and four yoga classes run each week. One pass or membership covers all of it.",
       ),
       finishReason: "stop",
     };
@@ -273,13 +433,13 @@ Add fries and a fountain drink for **$5**. Say “highlight the burger menu” o
 
   return {
     parts: textParts(
-      `Welcome to **Stackhouse Burger Co.** I can help with the menu, hours, ordering, and dietary questions.
+      `Welcome to **Basalt Bouldering Co.** I can help with rates, hours, gear, first visits, and the route setting schedule.
 
 Try asking:
-- “How much is the Smoke Show?”
-- “Highlight the combo deals”
+- “How much is a day pass?”
+- “Highlight the membership plans”
 - “Take me to the FAQ”
-- “Start a pickup order” (on the pricing page)`,
+- “Start a membership signup” (on the pricing page)`,
     ),
     finishReason: "stop",
   };
@@ -287,7 +447,7 @@ Try asking:
 
 export const mockModel: LanguageModelV2 = {
   specificationVersion: "v2",
-  provider: "bart-playground",
+  provider: "agent-playground",
   modelId: "scripted-mock",
   supportedUrls: {},
   doGenerate: async () => {

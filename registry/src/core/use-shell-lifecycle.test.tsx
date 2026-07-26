@@ -63,7 +63,7 @@ describe("useShellLifecycle", () => {
     fireEvent.click(screen.getByText("open"));
     fireEvent.click(screen.getByText("close"));
     expect(screen.getByTestId("panel").dataset["closing"]).toBe("true");
-    // e.g. the selection popover's "Ask Bart" while the exit animation plays
+    // e.g. the selection popover's "Ask Agent" while the exit animation plays
     fireEvent.click(screen.getByText("open"));
     const panel = screen.getByTestId("panel");
     expect(panel.dataset["closing"]).toBe("false");

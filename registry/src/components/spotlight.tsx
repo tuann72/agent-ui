@@ -4,24 +4,24 @@ import { useEffect, useRef, useState } from "react";
 import { useFocusTrap } from "../core/focus-trap";
 import { shouldTriggerShortcut } from "../core/shortcut";
 import { useShellLifecycle } from "../core/use-shell-lifecycle";
-import type { BartUIMessage } from "../core/types";
-import { BartShellProvider, useBartContext } from "./bart-provider";
-import { AutoApproveButton, BartInput, BartMessages, surfaceClass } from "./chat-parts";
+import type { AgentUIMessage } from "../core/types";
+import { AgentShellProvider, useAgentContext } from "./agent-provider";
+import { AutoApproveButton, AgentInput, AgentMessages, surfaceClass } from "./chat-parts";
 import { RefreshIcon } from "./icons";
 
 /** Last user message plus everything after it — the current exchange. */
-function lastExchange(messages: BartUIMessage[]): BartUIMessage[] {
+function lastExchange(messages: AgentUIMessage[]): AgentUIMessage[] {
   const lastUserIndex = messages.findLastIndex((m) => m.role === "user");
   return lastUserIndex === -1 ? messages : messages.slice(lastUserIndex);
 }
 
-export interface BartSpotlightProps {
+export interface AgentSpotlightProps {
   shortcutKey?: string;
 }
 
-export function BartSpotlight({ shortcutKey = "/" }: BartSpotlightProps) {
-  const { bart, open, setOpen, title, icon, appearance, starterPrompts } =
-    useBartContext();
+export function AgentSpotlight({ shortcutKey = "/" }: AgentSpotlightProps) {
+  const { agent, open, setOpen, title, icon, appearance, starterPrompts } =
+    useAgentContext();
   const [showHistory, setShowHistory] = useState(false);
   // The spotlight has no launcher, so the shortcut handler stashes whatever
   // held focus and the lifecycle hook restores it after the panel unmounts.
@@ -52,22 +52,22 @@ export function BartSpotlight({ shortcutKey = "/" }: BartSpotlightProps) {
   if (!showPanel) {
     return (
       <p
-        className="bart-spotlight-hint bart-muted"
-        data-bart-ui="spotlight-hint"
+        className="agent-spotlight-hint agent-muted"
+        data-agent-ui="spotlight-hint"
         aria-hidden="true"
       >
-        {icon} Press <kbd className="bart-kbd">{shortcutKey}</kbd> to ask{" "}
+        {icon} Press <kbd className="agent-kbd">{shortcutKey}</kbd> to ask{" "}
         {title}
       </p>
     );
   }
 
-  const visible = showHistory ? bart.messages : lastExchange(bart.messages);
+  const visible = showHistory ? agent.messages : lastExchange(agent.messages);
 
   return (
-    <div className="bart-spotlight-root" data-bart-ui="spotlight">
+    <div className="agent-spotlight-root" data-agent-ui="spotlight">
       <div
-        className={`bart-spotlight-backdrop${closing ? " bart-closing" : ""}`}
+        className={`agent-spotlight-backdrop${closing ? " agent-closing" : ""}`}
         aria-hidden="true"
         onClick={close}
       />
@@ -75,37 +75,37 @@ export function BartSpotlight({ shortcutKey = "/" }: BartSpotlightProps) {
         ref={containerRef}
         role="dialog"
         aria-label={`${title} assistant`}
-        className={`bart-spotlight-container${closing ? " bart-closing" : ""}`}
+        className={`agent-spotlight-container${closing ? " agent-closing" : ""}`}
         onAnimationEnd={panelAnimationEnd}
       >
         {/* Shell context so a composed CloseButton plays the exit animation. */}
-        <BartShellProvider close={close}>
-          <div className={`${surfaceClass(appearance)} bart-spotlight-inputcard`}>
-            <BartInput
+        <AgentShellProvider close={close}>
+          <div className={`${surfaceClass(appearance)} agent-spotlight-inputcard`}>
+            <AgentInput
               autoFocus
               placeholder={`Ask ${title} anything…`}
-              className="bart-spotlight-input"
+              className="agent-spotlight-input"
             />
-            <div className="bart-spotlight-meta">
-              <span className="bart-muted">
-                <kbd className="bart-kbd">Esc</kbd> to close
+            <div className="agent-spotlight-meta">
+              <span className="agent-muted">
+                <kbd className="agent-kbd">Esc</kbd> to close
               </span>
-              <div className="bart-spotlight-actions">
+              <div className="agent-spotlight-actions">
                 <AutoApproveButton>Auto-approve</AutoApproveButton>
-                {bart.messages.length > 0 && (
+                {agent.messages.length > 0 && (
                   <>
                     <button
                       type="button"
-                      className="bart-btn-ghost"
+                      className="agent-btn-ghost"
                       onClick={() => setShowHistory((v) => !v)}
                     >
                       {showHistory ? "Latest only" : "Show conversation"}
                     </button>
                     <button
                       type="button"
-                      className="bart-btn-ghost"
+                      className="agent-btn-ghost"
                       onClick={() => {
-                        bart.reset();
+                        agent.reset();
                         setShowHistory(false);
                       }}
                     >
@@ -117,11 +117,11 @@ export function BartSpotlight({ shortcutKey = "/" }: BartSpotlightProps) {
             </div>
           </div>
           {(visible.length > 0 || starterPrompts.length > 0) && (
-            <div className={`${surfaceClass(appearance)} bart-spotlight-results`}>
-              <BartMessages messages={visible} />
+            <div className={`${surfaceClass(appearance)} agent-spotlight-results`}>
+              <AgentMessages messages={visible} />
             </div>
           )}
-        </BartShellProvider>
+        </AgentShellProvider>
       </div>
     </div>
   );

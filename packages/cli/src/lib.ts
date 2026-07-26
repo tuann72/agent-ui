@@ -1,5 +1,5 @@
 /**
- * Pure decision logic for the bart-ui CLI — no fs, no process, no prompts.
+ * Pure decision logic for the agent-ui CLI — no fs, no process, no prompts.
  * Everything here is unit-tested with plain values; `init.ts` supplies the IO.
  */
 
@@ -82,7 +82,7 @@ export interface DependencyMerge {
 }
 
 /**
- * Add bart-ui's runtime deps to a consumer package.json object. A dependency the
+ * Add agent-ui's runtime deps to a consumer package.json object. A dependency the
  * consumer already declares anywhere (deps/devDeps/peerDeps) keeps its range —
  * the CLI never overwrites version choices it does not own.
  */
@@ -152,23 +152,23 @@ export function noProviderHint(pm: PackageManager): string[] {
   return lines;
 }
 
-export interface BartConfig {
+export interface AgentConfig {
   /** CLI version that scaffolded this install. */
   cli: string;
-  /** Where the vendored bart-ui source lives, relative to the project root. */
+  /** Where the vendored agent-ui source lives, relative to the project root. */
   dir: string;
-  /** Markdown content directory for `bart sync` (invariant 11 default). */
+  /** Markdown content directory for `agent sync` (invariant 11 default). */
   content: string;
   provider: ProviderId | "none";
-  /** Install-time sha256 per template file, for the future `bart update`. */
+  /** Install-time sha256 per template file, for the future `agent update`. */
   files: Record<string, string>;
 }
 
-export function buildBartConfig(
+export function buildAgentConfig(
   cliVersion: string,
   dir: string,
   provider: ProviderId | "none",
   files: Record<string, string>,
-): BartConfig {
-  return { cli: cliVersion, dir, content: "content/bart", provider, files };
+): AgentConfig {
+  return { cli: cliVersion, dir, content: "content/agent", provider, files };
 }

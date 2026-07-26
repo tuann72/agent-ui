@@ -1,5 +1,5 @@
 {
-  "name": "bart-ui",
+  "name": "agent-ui",
   "type": "module",
   "private": true,
   "workspaces": [

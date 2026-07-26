@@ -46,7 +46,7 @@ export function useResizeDrag(onStart: () => void) {
   return (cursor: ResizeCursor, onDelta: (dx: number, dy: number) => void) => ({
     onPointerDown(event: ReactPointerEvent<HTMLElement>) {
       if (event.button !== 0) return;
-      const cls = `bart-resizing-${cursor}`;
+      const cls = `agent-resizing-${cursor}`;
       active.current = {
         pointerId: event.pointerId,
         x: event.clientX,

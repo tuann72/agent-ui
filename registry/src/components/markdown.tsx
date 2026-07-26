@@ -34,7 +34,7 @@ export const MarkdownContent = memo(function MarkdownContent({
   children: string;
 }) {
   return (
-    <div className="bart-markdown">
+    <div className="agent-markdown">
       <ReactMarkdown
         remarkPlugins={REMARK_PLUGINS}
         skipHtml

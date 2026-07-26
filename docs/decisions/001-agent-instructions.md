@@ -1,4 +1,4 @@
-# ADR 001: Layer Bart's agent instructions
+# ADR 001: Layer the assistant's instructions
 
 Status: accepted
 
@@ -7,12 +7,12 @@ Status: accepted
 The server prompt is assembled in four layers:
 
 1. a non-removable security preamble;
-2. a concise Bart behavioral kernel;
+2. a concise Agent behavioral kernel;
 3. a structured, server-owned consumer agent profile plus the existing
    free-form `system` escape hatch;
 4. the current route and delimited, untrusted manifest context.
 
-The behavioral kernel tells Bart to treat requests as goals, prefer the
+The behavioral kernel tells Agent to treat requests as goals, prefer the
 smallest useful registered action, ask one question before an ambiguous
 action, confirm only observed tool results, and recover concisely. It does not
 contain consumer branding or security policy.

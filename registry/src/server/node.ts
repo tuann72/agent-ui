@@ -1,20 +1,20 @@
 /**
- * Node http bridge for the Fetch-standard Bart handler. Vite dev middleware,
+ * Node http bridge for the Fetch-standard Agent handler. Vite dev middleware,
  * Express, and plain node:http servers speak (IncomingMessage, ServerResponse);
- * this adapter lets them mount `createBartHandler` without hand-writing the
+ * this adapter lets them mount `createAgentHandler` without hand-writing the
  * translation. Kept out of server/index.ts so Bun/edge consumers never load
  * node:http.
  *
  * Vite example (vite.config.ts):
  *
- *   import { createBartHandler } from "./src/bart/server";
- *   import { toNodeHandler } from "./src/bart/server/node";
+ *   import { createAgentHandler } from "./src/agent/server";
+ *   import { toNodeHandler } from "./src/agent/server/node";
  *
- *   const bartDevServer = () => ({
- *     name: "bart-dev-server",
+ *   const agentDevServer = () => ({
+ *     name: "agent-dev-server",
  *     configureServer(server) {
- *       const handler = toNodeHandler(createBartHandler({ model, manifest }));
- *       server.middlewares.use("/api/bart", handler);
+ *       const handler = toNodeHandler(createAgentHandler({ model, manifest }));
+ *       server.middlewares.use("/api/agent", handler);
  *     },
  *   });
  */
@@ -82,7 +82,7 @@ export function toNodeHandler(
       ).pipe(res);
     })().catch((error) => {
       if (controller.signal.aborted) return;
-      console.error("[bart] node handler error:", error);
+      console.error("[agent] node handler error:", error);
       if (!res.headersSent) {
         res.writeHead(500, { "content-type": "application/json" });
       }
