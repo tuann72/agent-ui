@@ -16,7 +16,8 @@ export const publicManifest: AgentPublicManifest = {
         },
         {
           id: "gym-stats",
-          description: "Square footage, wall height, problem count, and reset rate.",
+          description:
+            "Square footage, wall height, problem count, and reset rate.",
         },
         {
           id: "disciplines",
@@ -37,11 +38,13 @@ export const publicManifest: AgentPublicManifest = {
       targets: [
         {
           id: "membership-plans",
-          description: "Monthly, annual, student, and household membership cards.",
+          description:
+            "Monthly, annual, student, and household membership cards.",
         },
         {
           id: "day-passes",
-          description: "Day pass, punch card, youth pass, and coached session rates.",
+          description:
+            "Day pass, punch card, youth pass, and coached session rates.",
         },
         {
           id: "gear-rentals",
@@ -66,9 +69,13 @@ export const publicManifest: AgentPublicManifest = {
         },
         {
           id: "route-setting",
-          description: "The weekly reset rotation, grade spread, and hold inventory.",
+          description:
+            "The weekly reset rotation, grade spread, and hold inventory.",
         },
-        { id: "the-team", description: "The setters, coaches, and community staff." },
+        {
+          id: "the-team",
+          description: "The setters, coaches, and community staff.",
+        },
       ],
     },
     {
@@ -79,7 +86,8 @@ export const publicManifest: AgentPublicManifest = {
       targets: [
         {
           id: "first-visit-faq",
-          description: "Experience needed, what to bring, and how early to arrive.",
+          description:
+            "Experience needed, what to bring, and how early to arrive.",
         },
         {
           id: "safety-faq",
@@ -93,6 +101,24 @@ export const publicManifest: AgentPublicManifest = {
           id: "sign-waiver",
           description: "Button that signs the liability waiver online.",
           interactive: true,
+        },
+      ],
+    },
+    {
+      route: "/credits",
+      title: "Credits",
+      description:
+        "Disclosure that the site is an AI-generated fixture, and per-photo attribution for its photography.",
+      targets: [
+        {
+          id: "site-disclosure",
+          description:
+            "Statement that the gym is fictional and the copy is AI generated.",
+        },
+        {
+          id: "photo-credits",
+          description:
+            "Table crediting each photograph's photographer and license.",
         },
       ],
     },

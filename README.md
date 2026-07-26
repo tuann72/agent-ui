@@ -23,8 +23,10 @@ bun run playground
 Open <http://localhost:5173>. Vite serves both the site and the deterministic
 mock API at `/api/agent`; no key, second process, or port 8787 is needed.
 
-The fixture site is Basalt Bouldering Co., a fictional climbing gym with four
-pages. It is built to exercise the whole feature surface: two `interactive`
+The fixture site is Basalt Bouldering Co., a fictional climbing gym. Its copy is
+AI generated and its photography is licensed stock — `/credits` says so plainly
+and attributes every photograph, and the footer repeats the disclosure on every
+page. It is built to exercise the whole feature surface: two `interactive`
 targets on different routes for the approval flow, contextual starter prompts
 per page, a hero photo that shows why `highlightOptions` exists, and light and
 dark themes over the same four-color palette. It also demonstrates the dock's

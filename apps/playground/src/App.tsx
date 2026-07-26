@@ -36,7 +36,7 @@ export default function App() {
         <main className="flex-1">
           <PageContent route={route} navigate={navigate} />
         </main>
-        <SiteFooter />
+        <SiteFooter navigate={navigate} />
       </div>
 
       {/* Remounting on variant change resets the conversation — intentional

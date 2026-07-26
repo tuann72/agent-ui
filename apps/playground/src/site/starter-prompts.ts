@@ -38,11 +38,21 @@ const FAQ_STARTERS: readonly AgentStarterPrompt[] = [
   { label: "Sign the waiver", prompt: "Sign the waiver for me" },
 ];
 
+const CREDITS_STARTERS: readonly AgentStarterPrompt[] = [
+  { label: "Is this gym real?", prompt: "Is this a real climbing gym?" },
+  { label: "Who took the photos?", prompt: "Highlight the photo credits" },
+  {
+    label: "What's the license?",
+    prompt: "What license are the photos under?",
+  },
+];
+
 const STARTERS_BY_ROUTE: Record<string, readonly AgentStarterPrompt[]> = {
   "/": HOME_STARTERS,
   "/pricing": PRICING_STARTERS,
   "/about": ABOUT_STARTERS,
   "/faq": FAQ_STARTERS,
+  "/credits": CREDITS_STARTERS,
 };
 
 export function starterPromptsFor(

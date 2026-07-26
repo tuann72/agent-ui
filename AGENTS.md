@@ -15,7 +15,7 @@ server code.
   server handler with a separate Node HTTP bridge.
 - `apps/playground/`: Vite site and same-process `/api/agent` middleware using a
   deterministic mock model. Vite serves the UI and API on port 5173. The fixture
-  site is Basalt Bouldering Co. (four routes); every Agent knob lives in a
+  site is Basalt Bouldering Co. (five routes); every Agent knob lives in a
   Tweakpane control panel behind a collapsible left-edge tab.
 - `packages/cli/`: zero-runtime-dependency `@agent-ui/cli`. `agent init` copies
   bundled templates, writes `.agent.json` with file hashes, and adds required
@@ -266,6 +266,14 @@ cannot be reached from the panel or a URL, nobody will find it.
 - **Photos** live in `public/img/` with `CREDITS.md` (source URL and license per
   file). Keep them size-capped and offline; always set intrinsic `width`/`height`
   so a decoding image cannot shift a highlight target.
+- **The fixture says it is a fixture.** `/credits` carries the AI-generated
+  disclosure and per-photo attribution, and the footer repeats the disclosure on
+  every page, so a screenshot cannot circulate as if the gym were real. Its data
+  lives in `site-data.ts` (`DISCLOSURE`, `PHOTO_CREDITS`, `PHOTO_LICENSE`) and
+  must stay in step with `public/img/CREDITS.md`. The route is registered in the
+  manifest so Agent can navigate and answer from it, but `NAV_EXCLUDED` in
+  `site-chrome.tsx` keeps it out of the main nav; add a photo and it needs a row
+  in both places.
 
 ## Load-bearing gotchas
 

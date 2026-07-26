@@ -64,9 +64,11 @@ function textParts(text: string): LanguageModelV2StreamPart[] {
   const deltas = text.split(/(?<=\s)/);
   return [
     { type: "text-start", id },
-    ...deltas.map(
-      (delta): LanguageModelV2StreamPart => ({ type: "text-delta", id, delta }),
-    ),
+    ...deltas.map((delta): LanguageModelV2StreamPart => ({
+      type: "text-delta",
+      id,
+      delta,
+    })),
     { type: "text-end", id },
   ];
 }
@@ -87,6 +89,19 @@ function toolCallParts(
 }
 
 function pickRoute(text: string): string {
+  // Ahead of the rest: "who took the photos" also contains no other keyword,
+  // but "is this real" would otherwise fall through to the pricing default.
+  if (
+    text.includes("credit") ||
+    text.includes("photo") ||
+    text.includes("image") ||
+    text.includes("attribution") ||
+    text.includes("license") ||
+    text.includes("ai generated") ||
+    text.includes("disclosure")
+  ) {
+    return "/credits";
+  }
   if (
     text.includes("faq") ||
     text.includes("question") ||
@@ -124,7 +139,25 @@ function pickRoute(text: string): string {
 }
 
 function pickTarget(text: string): string {
-  if (text.includes("waiver") || text.includes("sign")) return "first-visit-faq";
+  if (
+    text.includes("credit") ||
+    text.includes("photo") ||
+    text.includes("image") ||
+    text.includes("photographer") ||
+    text.includes("license")
+  ) {
+    return "photo-credits";
+  }
+  if (
+    text.includes("ai generated") ||
+    text.includes("disclosure") ||
+    text.includes("fictional") ||
+    text.includes("real")
+  ) {
+    return "site-disclosure";
+  }
+  if (text.includes("waiver") || text.includes("sign"))
+    return "first-visit-faq";
   if (
     text.includes("belay") ||
     text.includes("certif") ||
@@ -150,10 +183,18 @@ function pickTarget(text: string): string {
   ) {
     return "first-visit-faq";
   }
-  if (text.includes("rental") || text.includes("shoe") || text.includes("gear")) {
+  if (
+    text.includes("rental") ||
+    text.includes("shoe") ||
+    text.includes("gear")
+  ) {
     return "gear-rentals";
   }
-  if (text.includes("day pass") || text.includes("punch") || text.includes("class")) {
+  if (
+    text.includes("day pass") ||
+    text.includes("punch") ||
+    text.includes("class")
+  ) {
     return "day-passes";
   }
   if (
@@ -166,16 +207,32 @@ function pickTarget(text: string): string {
   ) {
     return "membership-plans";
   }
-  if (text.includes("setting") || text.includes("setter") || text.includes("reset")) {
+  if (
+    text.includes("setting") ||
+    text.includes("setter") ||
+    text.includes("reset")
+  ) {
     return "route-setting";
   }
-  if (text.includes("team") || text.includes("coach") || text.includes("staff")) {
+  if (
+    text.includes("team") ||
+    text.includes("coach") ||
+    text.includes("staff")
+  ) {
     return "the-team";
   }
-  if (text.includes("story") || text.includes("kiln") || text.includes("history")) {
+  if (
+    text.includes("story") ||
+    text.includes("kiln") ||
+    text.includes("history")
+  ) {
     return "our-story";
   }
-  if (text.includes("hour") || text.includes("location") || text.includes("visit")) {
+  if (
+    text.includes("hour") ||
+    text.includes("location") ||
+    text.includes("visit")
+  ) {
     return "visit-us";
   }
   if (
@@ -188,7 +245,11 @@ function pickTarget(text: string): string {
   ) {
     return "disciplines";
   }
-  if (text.includes("stat") || text.includes("how big") || text.includes("square")) {
+  if (
+    text.includes("stat") ||
+    text.includes("how big") ||
+    text.includes("square")
+  ) {
     return "gym-stats";
   }
   return "home-hero";
@@ -250,7 +311,10 @@ function respond(prompt: LanguageModelV2Prompt): {
       .filter((line) => line.startsWith("> "))
       .map((line) => line.slice(2))
       .join(" ");
-    const question = lines.filter((line) => !line.startsWith("> ")).join(" ").toLowerCase();
+    const question = lines
+      .filter((line) => !line.startsWith("> "))
+      .join(" ")
+      .toLowerCase();
     if (!/highlight|go to|navigate|take me/.test(question)) {
       const excerpt = quote.length > 80 ? `${quote.slice(0, 80)}…` : quote;
       return {

@@ -3,6 +3,7 @@
  * every `data-agent-target` rendered below is registered in both manifests.
  */
 import { AboutPage } from "./about";
+import { CreditsPage } from "./credits";
 import { FaqPage } from "./faq";
 import { HomePage } from "./home";
 import { PricingPage } from "./pricing";
@@ -17,5 +18,6 @@ export function PageContent({
   if (route === "/pricing") return <PricingPage />;
   if (route === "/about") return <AboutPage />;
   if (route === "/faq") return <FaqPage />;
+  if (route === "/credits") return <CreditsPage />;
   return <HomePage navigate={navigate} />;
 }

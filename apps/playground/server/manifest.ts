@@ -195,4 +195,45 @@ Two setters and a rotating crew of four strip and reset one wall a night, Monday
 
 **Can I bring a guest?** Monthly and student members get guest passes each month; annual and household members get more. Guests still sign a waiver.`,
   },
+  "/credits": {
+    keywords: [
+      "credits",
+      "attribution",
+      "photo",
+      "photos",
+      "photographer",
+      "image",
+      "images",
+      "license",
+      "Unsplash",
+      "AI",
+      "AI generated",
+      "fictional",
+      "fake",
+      "real",
+      "disclosure",
+      "source",
+    ],
+    body: `# Credits and disclosure
+
+## This site is a fixture, not a business
+
+Basalt Bouldering Co. does not exist. It was generated as a test fixture for the agent-ui playground — the gym, its staff, its prices, its address, and its history are all invented. The copy on every page was written by an AI model. Nothing here can be bought and no form on this site sends anything anywhere.
+
+## Photography
+
+The photographs are the one thing on this site that is real: licensed stock images of actual climbing gyms, downloaded and committed so the demo runs offline. All seven are used under the Unsplash License, which requires no permission or attribution — they are credited anyway.
+
+| Photograph | Photographer | Used on |
+| --- | --- | --- |
+| gym-floor.jpg | Nathan Cima | Home hero |
+| session.jpg | Nathan Cima | Disciplines |
+| setting-hold.jpg | 2H Media | Route setting |
+| gear-shoes.jpg | Chaewool Kim | Gear rentals |
+| boulder-slab.jpg | Tofan Teodor | Home, bouldering |
+| climber-reach.jpg | Beta Boulders | Pricing |
+| community.jpg | Stacie Ong | About, the team |
+
+Each photographer's source page is linked from the credits table on this page. The same list lives in \`apps/playground/public/img/CREDITS.md\` in the repository.`,
+  },
 });

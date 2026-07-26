@@ -104,8 +104,16 @@ export const MEMBERSHIPS = [
 ] as const;
 
 export const DAY_PASSES = [
-  { name: "Day pass", price: "$24", detail: "All day, in and out as you like." },
-  { name: "Day pass + gear", price: "$34", detail: "Shoes and chalk included." },
+  {
+    name: "Day pass",
+    price: "$24",
+    detail: "All day, in and out as you like.",
+  },
+  {
+    name: "Day pass + gear",
+    price: "$34",
+    detail: "Shoes and chalk included.",
+  },
   { name: "Ten-punch card", price: "$200", detail: "No expiry. Shareable." },
   { name: "Youth day pass", price: "$16", detail: "Fourteen and under." },
 ] as const;
@@ -206,3 +214,66 @@ export const MEMBERSHIP_FAQS = [
       "Monthly and student members get guest passes each month; annual and household members get more. Guests still sign a waiver.",
   },
 ] as const;
+
+/**
+ * Provenance for the demo. Kept here with the rest of the copy so the page and
+ * the server manifest quote the same facts, and mirrored in
+ * `public/img/CREDITS.md` for anyone reading the repository rather than the site.
+ */
+export const DISCLOSURE = {
+  summary:
+    "Basalt Bouldering Co. does not exist. It was generated as a test fixture for the agent-ui playground — the gym, its staff, its prices, and its history are all invented.",
+  detail:
+    "The copy on every page was written by an AI model. The photographs are real, licensed stock images of real climbing gyms, and they are credited below. Nothing on this site can be bought and no form here sends anything anywhere.",
+} as const;
+
+export const PHOTO_CREDITS = [
+  {
+    file: "gym-floor.jpg",
+    photographer: "Nathan Cima",
+    used: "Home hero",
+    url: "https://unsplash.com/photos/a-group-of-people-standing-around-a-climbing-wall-3Z95_0rAy88",
+  },
+  {
+    file: "session.jpg",
+    photographer: "Nathan Cima",
+    used: "Disciplines",
+    url: "https://unsplash.com/photos/a-close-up-of-a-rock-climbing-wall-TDhpTIK-neM",
+  },
+  {
+    file: "setting-hold.jpg",
+    photographer: "2H Media",
+    used: "Route setting",
+    url: "https://unsplash.com/photos/a-hand-is-holding-a-black-object-in-front-of-a-white-wall-N44VnHYFJ4I",
+  },
+  {
+    file: "gear-shoes.jpg",
+    photographer: "Chaewool Kim",
+    used: "Gear rentals",
+    url: "https://unsplash.com/photos/a-pair-of-hiking-shoes-sitting-on-top-of-a-pile-of-rope-photo-1708290369261",
+  },
+  {
+    file: "boulder-slab.jpg",
+    photographer: "Tofan Teodor",
+    used: "Home, bouldering",
+    url: "https://unsplash.com/photos/a-man-climbing-on-a-climbing-wall-in-a-gym-0dnZDy6QPl4",
+  },
+  {
+    file: "climber-reach.jpg",
+    photographer: "Beta Boulders",
+    used: "Pricing",
+    url: "https://unsplash.com/photos/man-climbing-a-wall-with-colorful-shorts-wp12LpP5Dw8",
+  },
+  {
+    file: "community.jpg",
+    photographer: "Stacie Ong",
+    used: "About, the team",
+    url: "https://unsplash.com/photos/a-man-sitting-on-the-ground-next-to-a-dog-2SbULZnh-3s",
+  },
+] as const;
+
+export const PHOTO_LICENSE = {
+  name: "Unsplash License",
+  url: "https://unsplash.com/license",
+  note: "Free for commercial use with no permission or attribution required. Credited here regardless.",
+} as const;
