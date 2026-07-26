@@ -1,48 +1,28 @@
-import type { AgentServerManifest } from "@agent-ui/registry/server";
+import { withContent } from "@agent-ui/registry/server";
+import { publicManifest } from "../src/manifest";
 
-/** Server-only manifest: includes markdown bodies. */
-export const serverManifest: AgentServerManifest = {
-  documents: [
-    {
-      route: "/",
-      title: "Home",
-      description:
-        "Basalt Bouldering Co. location, hours, walls, and what is inside the gym.",
-      keywords: [
-        "home",
-        "Basalt",
-        "bouldering",
-        "climbing",
-        "gym",
-        "hours",
-        "location",
-        "Bend",
-        "Oregon",
-        "walls",
-        "training",
-      ],
-      targets: [
-        {
-          id: "home-hero",
-          description:
-            "The hero photo, gym name, and tagline over the bouldering floor.",
-        },
-        {
-          id: "gym-stats",
-          description:
-            "Square footage, wall height, problem count, and reset rate.",
-        },
-        {
-          id: "disciplines",
-          description:
-            "Bouldering, top rope and lead, the training room, and yoga classes.",
-        },
-        {
-          id: "visit-us",
-          description: "The gym address, parking, transit, and opening hours.",
-        },
-      ],
-      body: `# Basalt Bouldering Co.
+/**
+ * Server-only manifest: the public manifest plus the markdown bodies and
+ * retrieval keywords, which must never reach the browser. Routes, titles,
+ * descriptions, and targets are not repeated here — `withContent` carries them
+ * over, so a page is described in exactly one place.
+ */
+export const serverManifest = withContent(publicManifest, {
+  "/": {
+    keywords: [
+      "home",
+      "Basalt",
+      "bouldering",
+      "climbing",
+      "gym",
+      "hours",
+      "location",
+      "Bend",
+      "Oregon",
+      "walls",
+      "training",
+    ],
+    body: `# Basalt Bouldering Co.
 
 Basalt Bouldering Co. is a climbing gym at **118 Kiln Street, Bend, Oregon**, in a brick kiln works that closed in 2003. It holds 14,000 square feet of climbable terrain, and the tallest rope wall is 22 feet.
 
@@ -70,52 +50,27 @@ Basalt Bouldering Co. is a climbing gym at **118 Kiln Street, Bend, Oregon**, in
 ## Getting here
 
 Free parking in the lot off Kiln Street, covered bike parking under the loading dock, and the number 4 bus stops at Reed Market and Ninth. Phone: (541) 555-0142.`,
-    },
-    {
-      route: "/pricing",
-      title: "Pricing",
-      description:
-        "Membership rates, day passes, punch cards, coached classes, and gear rentals.",
-      keywords: [
-        "pricing",
-        "price",
-        "cost",
-        "membership",
-        "monthly",
-        "annual",
-        "student",
-        "household",
-        "day pass",
-        "punch card",
-        "rental",
-        "shoes",
-        "harness",
-        "chalk",
-        "class",
-        "belay certification",
-      ],
-      targets: [
-        {
-          id: "membership-plans",
-          description:
-            "Monthly, annual, student, and household membership cards.",
-        },
-        {
-          id: "day-passes",
-          description:
-            "Day pass, punch card, youth pass, and coached session rates.",
-        },
-        {
-          id: "gear-rentals",
-          description: "Shoe, chalk, harness, and full-kit rental prices.",
-        },
-        {
-          id: "start-membership",
-          description: "Button that starts a membership signup.",
-          interactive: true,
-        },
-      ],
-      body: `# Rates
+  },
+  "/pricing": {
+    keywords: [
+      "pricing",
+      "price",
+      "cost",
+      "membership",
+      "monthly",
+      "annual",
+      "student",
+      "household",
+      "day pass",
+      "punch card",
+      "rental",
+      "shoes",
+      "harness",
+      "chalk",
+      "class",
+      "belay certification",
+    ],
+    body: `# Rates
 
 There is no initiation fee, no facility fee, and no separate charge for the training room. Monthly memberships are month to month and cancel with thirty days' notice.
 
@@ -154,44 +109,25 @@ Every membership covers all walls, the training room, and unlimited yoga and mob
 | Full kit | $12 | Shoes, chalk, and harness. |
 
 Nothing but clothes is needed to boulder here. A membership signup can be started from this page with the **Start membership signup** button.`,
-    },
-    {
-      route: "/about",
-      title: "About",
-      description:
-        "The gym's history in a former brick kiln, its route setting program, and its staff.",
-      keywords: [
-        "about",
-        "story",
-        "history",
-        "kiln",
-        "member-owned",
-        "setting",
-        "setters",
-        "reset",
-        "rotation",
-        "grades",
-        "holds",
-        "team",
-        "coaches",
-        "staff",
-      ],
-      targets: [
-        {
-          id: "our-story",
-          description: "How the kiln works became a gym, and member ownership.",
-        },
-        {
-          id: "route-setting",
-          description:
-            "The weekly reset rotation, grade spread, and hold inventory.",
-        },
-        {
-          id: "the-team",
-          description: "The setters, coaches, and community staff.",
-        },
-      ],
-      body: `# About Basalt Bouldering Co.
+  },
+  "/about": {
+    keywords: [
+      "about",
+      "story",
+      "history",
+      "kiln",
+      "member-owned",
+      "setting",
+      "setters",
+      "reset",
+      "rotation",
+      "grades",
+      "holds",
+      "team",
+      "coaches",
+      "staff",
+    ],
+    body: `# About Basalt Bouldering Co.
 
 ## Story
 
@@ -213,51 +149,27 @@ Two setters and a rotating crew of four strip and reset one wall a night, Monday
 - **Ines Okafor — head setter:** fifteen years setting, four on the national circuit. Owns the weekly reset calendar.
 - **Marco Deel — coaching director:** runs the youth team and the adult performance block.
 - **Priya Raman — community manager:** organizes the Thursday night league, the winter comp, and the potlucks.`,
-    },
-    {
-      route: "/faq",
-      title: "FAQ",
-      description:
-        "First-visit guidance, gear, belay certification, kids, waivers, and membership terms.",
-      keywords: [
-        "FAQ",
-        "questions",
-        "first visit",
-        "beginner",
-        "experience",
-        "what to bring",
-        "waiver",
-        "belay",
-        "certification",
-        "kids",
-        "youth",
-        "age",
-        "guest",
-        "freeze",
-        "cancel",
-        "contract",
-      ],
-      targets: [
-        {
-          id: "first-visit-faq",
-          description:
-            "Experience needed, what to bring, and how early to arrive.",
-        },
-        {
-          id: "safety-faq",
-          description: "Belay certification, minimum ages, and the waiver.",
-        },
-        {
-          id: "membership-faq",
-          description: "Contracts, freezes, cancellation, and guest passes.",
-        },
-        {
-          id: "sign-waiver",
-          description: "Button that signs the liability waiver online.",
-          interactive: true,
-        },
-      ],
-      body: `# Frequently asked questions
+  },
+  "/faq": {
+    keywords: [
+      "FAQ",
+      "questions",
+      "first visit",
+      "beginner",
+      "experience",
+      "what to bring",
+      "waiver",
+      "belay",
+      "certification",
+      "kids",
+      "youth",
+      "age",
+      "guest",
+      "freeze",
+      "cancel",
+      "contract",
+    ],
+    body: `# Frequently asked questions
 
 ## First visit
 
@@ -282,6 +194,5 @@ Two setters and a rotating crew of four strip and reset one wall a night, Monday
 **Can I freeze my membership?** Up to three months a year at no cost, for injury, travel, or a long outdoor season.
 
 **Can I bring a guest?** Monthly and student members get guest passes each month; annual and household members get more. Guests still sign a waiver.`,
-    },
-  ],
-};
+  },
+});

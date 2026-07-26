@@ -1,27 +1,20 @@
 import { expect, test } from "bun:test";
-import type { AgentPublicManifest } from "@agent-ui/registry";
 import { publicManifest } from "../src/manifest";
 import { serverManifest } from "./manifest";
 
 /**
- * The two manifests are hand-written until `agent sync` generates both from
- * one source. Until then this guards the split: the public manifest must be
- * exactly the server manifest minus everything server-only (bodies,
- * keywords) — same routes, same order, same metadata, same targets.
+ * `withContent` makes the two manifests structurally impossible to diverge, so
+ * what is left to check is the content half: every page the browser knows about
+ * needs a body, or the assistant has nothing to answer from on that route.
  */
-test("public manifest is the server manifest's safe projection", () => {
-  const projected: AgentPublicManifest = {
-    routes: serverManifest.documents.map((doc) => ({
-      route: doc.route,
-      title: doc.title,
-      description: doc.description,
-      targets: doc.targets ?? [],
-    })),
-  };
-  expect(publicManifest).toEqual(projected);
+test("every public route has server content", () => {
+  for (const doc of serverManifest.documents) {
+    expect(doc.body.length).toBeGreaterThan(0);
+  }
+  expect(serverManifest.documents).toHaveLength(publicManifest.routes.length);
 });
 
-test("no route appears twice in the server manifest", () => {
-  const routes = serverManifest.documents.map((doc) => doc.route);
+test("no route appears twice in the public manifest", () => {
+  const routes = publicManifest.routes.map((route) => route.route);
   expect(new Set(routes).size).toBe(routes.length);
 });

@@ -133,13 +133,13 @@ import `./agent/tailwind.css` for token-backed utilities.
 
 ### 3. Define site knowledge
 
-Until `agent sync` ships, create two TypeScript manifests:
-
-- A public manifest with routes and target IDs, safe for the browser.
-- A server manifest containing the markdown bodies, imported only by the API.
+Until `agent sync` ships, describe your pages in one browser-safe manifest, then
+add the markdown in a second, server-only file. Each page is written once: the
+routes, titles, descriptions, and targets live in the public manifest, and
+`withContent` carries them into the server manifest for you.
 
 ```ts
-// src/manifest.ts — browser-safe
+// src/manifest.ts — browser-safe, the single description of your pages
 import type { AgentPublicManifest } from "./agent";
 
 export const publicManifest: AgentPublicManifest = {
@@ -163,28 +163,23 @@ export const publicManifest: AgentPublicManifest = {
 
 ```ts
 // src/manifest.server.ts — server-only
-import type { AgentServerManifest } from "./agent/server";
+import { withContent } from "./agent/server";
+import { publicManifest } from "./manifest";
 
-export const serverManifest: AgentServerManifest = {
-  documents: [
-    {
-      route: "/pricing",
-      title: "Pricing",
-      description: "Membership rates, day passes, and gear rentals",
-      keywords: ["price", "membership", "day pass", "rental"],
-      targets: [
-        { id: "membership-plans", description: "Membership plan cards" },
-        {
-          id: "start-membership",
-          description: "Start membership signup button",
-          interactive: true,
-        },
-      ],
-      body: "## Pricing\nA monthly membership is $79. A day pass is $24.",
-    },
-  ],
-};
+export const serverManifest = withContent(publicManifest, {
+  "/pricing": {
+    keywords: ["price", "membership", "day pass", "rental"],
+    body: "## Pricing\nA monthly membership is $79. A day pass is $24.",
+  },
+});
 ```
+
+Markdown bodies must never reach the browser, which is why the content is added
+here rather than derived the other way — only this server-only module references
+it. Every route in the public manifest becomes a document, so the pages the model
+knows about and the pages the browser will allow are always the same set. A key
+that is not a route in the public manifest throws, so a typo cannot silently
+leave a page's content unreachable.
 
 Match targets in the page markup:
 
@@ -338,14 +333,18 @@ Required props are `api`, `currentRoute`, `navigate`, and `manifest`.
 The dock keeps one bottom-anchored surface mounted while it opens and closes,
 so the collapsed tab grows into the conversation panel instead of being
 replaced by a second element rising from below. The tab and panel header use
-the same primary color, and reduced-motion preferences skip the transition.
+the same primary color, and the brand's horizontal and vertical motion meets
+the collapsed layout without a final alignment snap. Reduced-motion
+preferences skip the transition.
 
 The chosen `selectionSide` is honored rather than flipped — the popover is only
 nudged back inside the viewport when it would overflow. Its main **Ask Agent**
 segment attaches the selected text and opens the current shell; the adjacent
 plus button attaches the same bounded context without opening anything. Queued
 selections appear as removable chips the next time Agent opens and are included
-in the next ordinary user message.
+in the next ordinary user message. The compact split control is 38px tall and
+uses rounded outer corners; override `--agent-selection-radius` to adjust that
+corner treatment independently from the rest of Agent.
 
 `highlightOptions` exists so the overlay stays legible over images, video, and
 dark artwork:
@@ -392,7 +391,7 @@ exported for typed wrappers.
 
 ```bash
 bun run typecheck    # registry, CLI, and playground TypeScript
-bun test             # 168 unit and component-contract tests
+bun test             # 172 unit and component-contract tests
 bun run test:e2e     # 15 Chromium flows; starts Vite automatically
 bun run cli:build    # rebuild CLI output and bundled templates
 ```

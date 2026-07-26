@@ -39,6 +39,10 @@ test("dock launcher grows into a same-color bottom-anchored frame", async ({
     const launcher = page.getByRole("button", { name: "Agent", exact: true });
     const closedBox = await frame.boundingBox();
     if (!closedBox) throw new Error("closed dock frame was not measurable");
+    const closedIconBox = await launcher.locator("svg").boundingBox();
+    if (!closedIconBox) throw new Error("closed dock icon was not measurable");
+    const closedIconInset = closedIconBox.x - closedBox.x;
+    const closedIconBlockInset = closedIconBox.y - closedBox.y;
     const closedColor = await launcher.evaluate(
       (element) => getComputedStyle(element).backgroundColor,
     );
@@ -51,8 +55,18 @@ test("dock launcher grows into a same-color bottom-anchored frame", async ({
 
     const openBox = await frame.boundingBox();
     if (!openBox) throw new Error("open dock frame was not measurable");
+    const openIconBox = await dialog(page)
+      .locator(".agent-panel-title svg")
+      .boundingBox();
+    if (!openIconBox) throw new Error("open dock icon was not measurable");
     expect(openBox.width).toBeGreaterThan(closedBox.width);
     expect(openBox.height).toBeGreaterThan(closedBox.height);
+    // The brand rides the moving start edge during collapse. Its inset must
+    // match the launcher's exactly so the final panel-to-tab swap cannot snap
+    // sideways.
+    expect(
+      Math.abs(openIconBox.x - openBox.x - closedIconInset),
+    ).toBeLessThan(0.5);
     expect(
       Math.abs(
         openBox.y + openBox.height - (closedBox.y + closedBox.height),
@@ -68,6 +82,32 @@ test("dock launcher grows into a same-color bottom-anchored frame", async ({
       // to catch color, geometry, border, and content changes.
       maxDiffPixelRatio: 0.002,
     });
+
+    // Hold the frame open but apply the closing brand's final position. This
+    // makes the transition endpoint deterministic instead of sampling an
+    // in-flight animation by wall-clock time.
+    await page.addStyleTag({
+      content: `
+        .agent-dock-frame { transition: none !important; }
+        .agent-dock-frame .agent-panel-title {
+          transition-duration: 0s !important;
+        }
+      `,
+    });
+    await page.getByRole("button", { name: "Close chat" }).click();
+    await expect(frame).toHaveAttribute("data-state", "closing");
+    const closingBox = await frame.boundingBox();
+    const closingIconBox = await dialog(page)
+      .locator(".agent-panel-title svg")
+      .boundingBox();
+    if (!closingBox || !closingIconBox) {
+      throw new Error("closing dock brand was not measurable");
+    }
+    expect(
+      Math.abs(
+        closingIconBox.y - closingBox.y - closedIconBlockInset,
+      ),
+    ).toBeLessThan(0.5);
   }
 });
 
@@ -239,6 +279,22 @@ test("the ask popover attaches to each of the four selection sides", async ({
     await paragraph.click({ clickCount: 3 });
     await expect(popover).toBeVisible();
     await expect(popover).toHaveAttribute("data-side", side);
+
+    if (side === "top") {
+      const ask = page.getByRole("button", { name: "Ask Agent" });
+      const add = page.getByRole("button", {
+        name: "Add selection to Agent context",
+      });
+      const askBox = await ask.boundingBox();
+      const addBox = await add.boundingBox();
+      if (!askBox || !addBox) {
+        throw new Error("selection actions were not measurable");
+      }
+      expect(askBox.height).toBe(38);
+      expect(addBox.height).toBe(38);
+      await expect(ask).toHaveCSS("border-top-left-radius", "10px");
+      await expect(add).toHaveCSS("border-top-right-radius", "10px");
+    }
 
     const text = (await paragraph.boundingBox())!;
     const box = (await popover.boundingBox())!;

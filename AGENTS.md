@@ -20,7 +20,7 @@ server code.
 - `packages/cli/`: zero-runtime-dependency `@agent-ui/cli`. `agent init` copies
   bundled templates, writes `.agent.json` with file hashes, and adds required
   dependencies without replacing consumer ranges.
-- Tests: 168 unit/component tests and 15 Playwright flows.
+- Tests: 172 unit/component tests and 15 Playwright flows.
 
 Not built yet: `agent add`, `sync`, `doctor`, and `update`; markdown ingestion;
 framework adapters/example apps; provider factories; durable rate limiting.
@@ -170,7 +170,11 @@ Do not weaken these constraints.
   dimensions; do not swap in a separately animated panel or use transform
   scaling. The launcher and header share `--agent-primary`. Only opening and
   closing transition dimensions so resize updates remain immediate; controlled
-  close and reduced motion remain immediate.
+  close and reduced motion remain immediate. Keep the dock header's brand inset
+  equal to the launcher's padding plus border so the final DOM swap cannot
+  introduce a horizontal snap. The expanded controls also place the brand
+  2.5px lower than the shorter launcher; opening and closing brand motion
+  bridges that vertical delta over the frame transition.
 - Cosmetic options are props (`appearance`, `icon`, `title`, shell header,
   separator, side, launcher, `starterPrompts`, `selectionSide`), not component
   forks. Cosmetic slots follow the same rule: `AgentMessages` takes
@@ -190,7 +194,9 @@ Do not weaken these constraints.
   measure-and-correct layout effect, and CSS owns the gap, centering, and
   slide direction through `--agent-popover-*` keyed on `data-side`. The split
   control's Ask and add-context segments must both delegate to the same bounded
-  quote queue; do not add shell-local selection storage.
+  quote queue; do not add shell-local selection storage. Its compact 38px
+  control uses `--agent-selection-radius` for rounded outer corners, independent
+  of a host's broader `--agent-radius`.
 - `AgentMessages` groups contiguous tool parts into one action card. The card
   may render status and the Replay control, but replay selection and execution
   stay in the headless core. Keep `replayActions` identity-stable like every
@@ -250,10 +256,13 @@ cannot be reached from the panel or a URL, nobody will find it.
   through CSS variables, so pages need almost no `dark:` variants and the two
   themes cannot drift. The `--agent-*` tokens map to the same palette and must
   clear AA in both themes.
-- **Fixture content is duplicated on purpose, and tested.** `src/manifest.ts`
-  must stay the safe projection of `server/manifest.ts`; `server/manifest.test.ts`
-  enforces it. Prices and hours shown in `site/site-data.ts` must match the
-  markdown bodies, or the assistant contradicts the page.
+- **One manifest describes the pages; the server file only adds content.**
+  `src/manifest.ts` is the single source of routes, titles, descriptions, and
+  targets, and `server/manifest.ts` passes it through `withContent` with the
+  bodies and keywords. Never restate route metadata in the server file. What
+  still needs checking is agreement with the *page*: prices and hours in
+  `site/site-data.ts` must match the markdown bodies, or the assistant
+  contradicts what the user is reading.
 - **Photos** live in `public/img/` with `CREDITS.md` (source URL and license per
   file). Keep them size-capped and offline; always set intrinsic `width`/`height`
   so a decoding image cannot shift a highlight target.
@@ -344,12 +353,22 @@ includes it first, then adds documents by deterministic lexical score
 40,000-character budget, truncating deterministically. The server-executed
 `search_content` tool retrieves further excerpts when that context is not
 enough — it reads the same server manifest, so it needs no client tool policy.
-Consumers hand-write the two manifests today: a browser-safe
-`AgentPublicManifest` (routes + target ids) and a server-only
-`AgentServerManifest` (the same plus markdown bodies and keywords).
+Consumers author this by hand today, but describe each page only once: they
+write the browser-safe `AgentPublicManifest` (routes + target ids), then
+`withContent(publicManifest, contentByRoute)` builds the server-only
+`AgentServerManifest` from it by attaching markdown bodies and keywords.
+
+That direction is deliberate and load-bearing. Deriving the public manifest
+*from* the server one would require importing markdown bodies into browser code
+in order to strip them out again, defeating the split; going public → server
+means only the server module ever references the content. `withContent` emits a
+document for every public route (empty body when a page has no content) so the
+model's catalog and the client's allowlist always cover the same pages, and
+throws on a content key that is not a manifest route.
 
 Only the *authoring* half is planned. Content will default to
 `<project-root>/content/agent`; front matter will require unique `title`,
 `description`, and relative `route`, with optional `keywords` and unique
-per-route targets, and `agent sync` will generate both manifests from it.
+per-route targets, and `agent sync` will generate the public manifest and the
+content map from it.
 Vector retrieval is out of V1 scope.

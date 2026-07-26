@@ -16,6 +16,7 @@ import {
 } from "./context";
 
 export type {
+  AgentRouteContent,
   AgentServerDocument,
   AgentServerManifest,
   ContextBlock,
@@ -28,6 +29,7 @@ export {
   searchContent,
   selectContext,
   tokenize,
+  withContent,
 } from "./context";
 
 export interface AgentLimits {

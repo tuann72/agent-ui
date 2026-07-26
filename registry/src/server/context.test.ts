@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
+import type { AgentPublicManifest } from "../core/types";
 import {
   formatContext,
   scoreDocument,
   selectContext,
+  withContent,
   type AgentServerManifest,
 } from "./context";
 
@@ -84,5 +86,62 @@ describe("formatContext", () => {
     const formatted = formatContext(blocks);
     expect(formatted).toContain('<agent-context route="/" title="Home">');
     expect(formatted).toContain("</agent-context>");
+  });
+});
+
+describe("withContent", () => {
+  const publicManifest: AgentPublicManifest = {
+    routes: [
+      {
+        route: "/",
+        title: "Home",
+        description: "Landing page.",
+        targets: [{ id: "hero", description: "Hero banner." }],
+      },
+      {
+        route: "/pricing",
+        title: "Pricing",
+        description: "Plans and billing.",
+        targets: [
+          { id: "plans", description: "Plan cards." },
+          { id: "buy", description: "Buy button.", interactive: true },
+        ],
+      },
+    ],
+  };
+
+  test("carries route metadata and targets over from the public manifest", () => {
+    const server = withContent(publicManifest, {
+      "/pricing": { body: "Pro is $20.", keywords: ["cost"] },
+    });
+    expect(server.documents).toHaveLength(2);
+    expect(server.documents[1]).toEqual({
+      route: "/pricing",
+      title: "Pricing",
+      description: "Plans and billing.",
+      keywords: ["cost"],
+      targets: [
+        { id: "plans", description: "Plan cards." },
+        { id: "buy", description: "Buy button.", interactive: true },
+      ],
+      body: "Pro is $20.",
+    });
+  });
+
+  test("keeps every public route, so both halves describe the same pages", () => {
+    const server = withContent(publicManifest, {});
+    expect(server.documents.map((doc) => doc.route)).toEqual(["/", "/pricing"]);
+    expect(server.documents[0]?.body).toBe("");
+  });
+
+  test("omits keywords rather than emitting an empty list", () => {
+    const server = withContent(publicManifest, { "/": { body: "Hello." } });
+    expect(server.documents[0]).not.toHaveProperty("keywords");
+  });
+
+  test("throws on content for a route the public manifest does not have", () => {
+    expect(() =>
+      withContent(publicManifest, { "/pricng": { body: "typo." } }),
+    ).toThrow('"/pricng" is not a route in the public manifest');
   });
 });

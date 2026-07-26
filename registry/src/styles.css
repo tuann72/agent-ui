@@ -17,6 +17,7 @@
   --agent-danger: oklch(0.5 0.2 25);
   --agent-danger-border: oklch(0.6 0.2 25);
   --agent-radius: 0.75rem;
+  --agent-selection-radius: 0.625rem;
   --agent-highlight-border-color: var(--agent-accent);
   --agent-highlight-border-width: 2px;
   --agent-highlight-border-style: solid;
@@ -231,30 +232,31 @@
 .agent-selection-actions {
   display: inline-flex;
   box-shadow: 0 6px 24px oklch(0 0 0 / 0.25);
-  border-radius: calc(var(--agent-radius) - 0.25rem);
+  border-radius: var(--agent-selection-radius);
 }
 
 .agent-selection-popover .agent-btn-primary {
   white-space: nowrap;
 }
 .agent-selection-ask {
+  padding: 0.3125rem 0.75rem;
   border-radius:
-    calc(var(--agent-radius) - 0.25rem) 0 0
-    calc(var(--agent-radius) - 0.25rem);
+    var(--agent-selection-radius) 0 0
+    var(--agent-selection-radius);
 }
 .agent-selection-add {
-  min-width: 2.75rem;
-  min-height: 2.75rem;
+  min-width: 2.375rem;
+  min-height: 2.375rem;
   justify-content: center;
-  padding: 0.375rem 0.625rem;
+  padding: 0.25rem 0.5rem;
   border-left: 1px solid color-mix(
     in oklch,
     var(--agent-primary-foreground) 35%,
     transparent
   );
   border-radius:
-    0 calc(var(--agent-radius) - 0.25rem)
-    calc(var(--agent-radius) - 0.25rem) 0;
+    0 var(--agent-selection-radius)
+    var(--agent-selection-radius) 0;
 }
 
 /* ---------- selected-text pills ---------- */
@@ -801,12 +803,28 @@
 .agent-dock-panel .agent-panel-header {
   background: var(--agent-primary);
 }
+.agent-dock-panel .agent-panel-title {
+  /* Match the tab brand's visual content inset: its 1.125rem padding plus 1px
+     border, minus the header's existing 0.875rem padding. Without this offset,
+     the brand snaps sideways when the closing panel becomes the launcher. */
+  margin-inline-start: calc(0.25rem + 1px);
+}
 
 .agent-dock-frame[data-state="opening"] .agent-panel-actions {
   animation: agent-dock-actions-in 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }
+.agent-dock-frame[data-state="opening"] .agent-panel-title {
+  animation: agent-dock-brand-in 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
 .agent-dock-frame[data-state="closing"] .agent-panel-actions {
   animation: agent-dock-actions-out 0.18s ease-in forwards;
+}
+.agent-dock-frame[data-state="closing"] .agent-panel-title {
+  /* Header controls make the expanded brand sit 2.5px lower than the same
+     brand inside the shorter launcher. Move through that delta while the
+     frame shrinks so the final DOM swap has no vertical snap. */
+  translate: 0 -2.5px;
+  transition: translate 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }
 /* Every resize affordance, corner or edge: invisible, with the directional
    cursor doing all the signalling. Hit areas stay narrow — a generous grab zone
@@ -1194,6 +1212,10 @@ body.agent-sidebar-push-left { margin-left: var(--agent-sidebar-width); }
   0%, 45% { opacity: 0; }
   to { opacity: 1; }
 }
+@keyframes agent-dock-brand-in {
+  from { translate: 0 -2.5px; }
+  to { translate: 0 0; }
+}
 @keyframes agent-dock-actions-out {
   from { opacity: 1; }
   to { opacity: 0; }
@@ -1268,6 +1290,7 @@ body.agent-sidebar-push-left { margin-left: var(--agent-sidebar-width); }
   .agent-highlight-overlay,
   .agent-sidebar-panel,
   .agent-dock-frame,
+  .agent-dock-panel .agent-panel-title,
   .agent-dock-panel .agent-panel-actions,
   .agent-sidebar-tab,
   .agent-sidebar-button,
@@ -1278,6 +1301,7 @@ body.agent-sidebar-push-left { margin-left: var(--agent-sidebar-width); }
   }
   body.agent-sidebar-push,
   .agent-dock-frame,
+  .agent-dock-panel .agent-panel-title,
   .agent-switch-track,
   .agent-switch-thumb {
     transition: none;
