@@ -92,7 +92,7 @@ the offline mock instead.
 To choose a model explicitly:
 
 ```bash
-bun run scripts/dev-real.ts --model gemini-3.1-flash-lite
+bun run scripts/dev-real.ts --model gemini-flash-lite-latest
 ```
 
 The launcher temporarily makes `@ai-sdk/google` available, generates the
@@ -216,7 +216,7 @@ import { createAgentHandler } from "@/agent/server";
 import { serverManifest } from "@/manifest.server";
 
 export const POST = createAgentHandler({
-  model: google("gemini-flash-lite-latest"),
+  model: google("gemini-flash-latest"),
   manifest: serverManifest,
 });
 ```
@@ -235,7 +235,7 @@ import { serverManifest } from "./manifest.server";
 
 export const handler = toNodeHandler(
   createAgentHandler({
-    model: google("gemini-flash-lite-latest"),
+    model: google("gemini-flash-latest"),
     manifest: serverManifest,
   }),
 );
@@ -286,7 +286,7 @@ them. Pass a structured `agent` profile, a free-form `system` string, or both:
 
 ```ts
 export const POST = createAgentHandler({
-  model: google("gemini-flash-lite-latest"),
+  model: google("gemini-flash-latest"),
   manifest: serverManifest,
   agent: {
     role: "Front-desk guide for Basalt Bouldering Co.",
@@ -307,7 +307,7 @@ removed by either field.
 
 | Provider | Adapter | Environment variable | Suggested model |
 | --- | --- | --- | --- |
-| Gemini | `@ai-sdk/google@^2` | `GOOGLE_GENERATIVE_AI_API_KEY` | `gemini-flash-lite-latest` |
+| Gemini | `@ai-sdk/google@^2` | `GOOGLE_GENERATIVE_AI_API_KEY` | `gemini-flash-latest` |
 | OpenAI | `@ai-sdk/openai@^2` | `OPENAI_API_KEY` | `gpt-4o-mini` |
 | Anthropic | `@ai-sdk/anthropic@^2` | `ANTHROPIC_API_KEY` | `claude-haiku-4-5` |
 

@@ -78,7 +78,7 @@ export const DEFAULT_CONFIG: PlaygroundConfig = {
   highlightPolicy: "auto",
   interactPolicy: "confirm",
   maxNavigationsPerTurn: 2,
-  maxInteractionsPerTurn: 2,
+  maxInteractionsPerTurn: 3,
 
   highlightOverride: false,
   // Seeded from the stylesheet's own defaults so flipping the override on

@@ -14,7 +14,7 @@
  * Usage (from the repo root):
  *   bun run scripts/dev-real.ts                    # defaults to Gemini
  *   bun run scripts/dev-real.ts --provider openai
- *   bun run scripts/dev-real.ts --model gemini-flash-latest --port 5173
+ *   bun run scripts/dev-real.ts --model gemini-flash-lite-latest --port 5173
  *
  * The API key is read from the root `.env` (auto-loaded by Bun). Any of a
  * provider's accepted variable names works; the launcher normalizes it into
@@ -45,8 +45,10 @@ const PROVIDERS: Record<string, ProviderConfig> = {
   google: {
     pkg: "@ai-sdk/google",
     factory: "createGoogleGenerativeAI",
-    // Rolling alias: always the current flash-lite release, never retires.
-    defaultModel: "gemini-flash-lite-latest",
+    // Rolling alias: always the current flash release, never retires. Same
+    // suggestion `agent init` prints, so the smoke test exercises what a
+    // consumer is told to use.
+    defaultModel: "gemini-flash-latest",
     canonicalEnv: "GOOGLE_GENERATIVE_AI_API_KEY",
     aliasEnv: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
     file: "gemini.local.ts",
