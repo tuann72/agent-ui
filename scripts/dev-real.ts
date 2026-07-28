@@ -7,7 +7,7 @@
  * it *produces* stays uncommitted — the adapter is installed locally (and the
  * touched manifests are immediately restored), and the generated server file
  * matches the gitignored `*.local.ts` pattern. This mirrors what the future
- * `@agent-ui/cli` will do for a consumer, without violating invariant 12
+ * `@tuann72/agent-ui` will do for a consumer, without violating invariant 12
  * (no provider adapter in the committed dependency tree; smoke-test setup
  * stays uncommitted).
  *
@@ -46,7 +46,7 @@ const PROVIDERS: Record<string, ProviderConfig> = {
     pkg: "@ai-sdk/google",
     factory: "createGoogleGenerativeAI",
     // Rolling alias: always the current flash release, never retires. Same
-    // suggestion `agent init` prints, so the smoke test exercises what a
+    // suggestion `agent-ui init` prints, so the smoke test exercises what a
     // consumer is told to use.
     defaultModel: "gemini-flash-latest",
     canonicalEnv: "GOOGLE_GENERATIVE_AI_API_KEY",

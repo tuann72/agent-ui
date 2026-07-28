@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/tuann72/agent-ui/main/packages/cli/schema.json",
+  "title": "Agent UI configuration",
+  "description": "Written to .agent.json by `agent-ui init`. Records where the vendored agent-ui source lives, which provider adapter was chosen, and the install-time hash of every scaffolded file.",
+  "type": "object",
+  "required": ["cli", "dir", "content", "provider", "files"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "URL of this schema."
+    },
+    "cli": {
+      "type": "string",
+      "description": "Version of the CLI that scaffolded this install."
+    },
+    "dir": {
+      "type": "string",
+      "description": "Where the vendored agent-ui source lives, relative to the project root.",
+      "default": "src/agent"
+    },
+    "content": {
+      "type": "string",
+      "description": "Markdown content directory for site knowledge, relative to the project root.",
+      "default": "content/agent"
+    },
+    "provider": {
+      "type": "string",
+      "description": "AI SDK adapter added to the project at init time. Models and API keys stay in server code.",
+      "enum": ["openai", "anthropic", "google", "none"]
+    },
+    "files": {
+      "type": "object",
+      "description": "sha256 of every scaffolded file at install time, keyed by path relative to `dir`. Lets a future `agent-ui update` tell edited files from untouched ones.",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    }
+  }
+}

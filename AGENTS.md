@@ -1,11 +1,11 @@
-# AGENTS.md — agent-ui contributor context
+# AGENTS.md: agent-ui contributor context
 
-`agent-ui` is a portable, shadcn-style React assistant toolkit. `@agent-ui/cli`
-copies its source into a consumer repository; consumers own that source and
-have no agent-ui runtime dependency. The shipped assistant is named Agent and
-provides streaming chat, site knowledge, safe navigation, element highlighting,
-and opt-in button clicking. Models and API keys always remain in consumer-owned
-server code.
+`agent-ui` is a portable, shadcn-style React assistant toolkit.
+`@tuann72/agent-ui` copies its source into a consumer repository; consumers own
+that source and have no agent-ui runtime dependency. The shipped assistant is
+named Agent and provides streaming chat, site knowledge, safe navigation,
+element highlighting, and opt-in button clicking. Models and API keys always
+remain in consumer-owned server code.
 
 ## What exists
 
@@ -17,15 +17,16 @@ server code.
   deterministic mock model. Vite serves the UI and API on port 5173. The fixture
   site is Basalt Bouldering Co. (five routes); every Agent knob lives in a
   Tweakpane control panel behind a collapsible left-edge tab.
-- `packages/cli/`: zero-runtime-dependency `@agent-ui/cli`. `agent init` copies
-  bundled templates, writes `.agent.json` with file hashes, and adds required
-  dependencies without replacing consumer ranges.
-- Tests: 172 unit/component tests and 15 Playwright flows.
+- `packages/cli/`: zero-runtime-dependency `@tuann72/agent-ui`. `agent-ui init`
+  copies bundled templates, writes `.agent.json` with file hashes, and adds
+  required dependencies without replacing consumer ranges.
+- Tests: 175 unit/component tests and 15 Playwright flows.
 
-Not built yet: `agent add`, `sync`, `doctor`, and `update`; markdown ingestion;
-framework adapters/example apps; provider factories; durable rate limiting.
+Not built yet: `agent-ui add`, `sync`, `doctor`, and `update`; markdown
+ingestion; framework adapters/example apps; provider factories; durable rate
+limiting.
 Those CLI commands currently report that they are unavailable. ADR 003's
-registered action registry is accepted but unimplemented — the client tool set
+registered action registry is accepted but unimplemented. The client tool set
 is still exactly `navigate`, `highlight`, and `interact` (plus the
 server-executed `search_content`).
 
@@ -46,9 +47,13 @@ server-executed `search_content`).
   as middleware. `*.local.ts` real-provider modules are generated and ignored.
 - `apps/playground/src/`: `router.ts` (History router + URL-encoded config),
   `config/` (the `PlaygroundConfig` model and its Tweakpane panel), and `site/`
-  (the gym's own chrome, pages, and copy — no dev knobs reach in there).
+  (the gym's own chrome, pages, and copy, with no dev knobs reaching in there).
 - `packages/cli/templates/` and `dist/`: generated, ignored, rebuilt by
-  `prepack`; the published package allowlist is `bin`, `dist`, `templates`.
+  `prepack`; the published package allowlist is `bin`, `dist`, `templates`,
+  `schema.json`, `CHANGELOG.md`. The package publishes as `@tuann72/agent-ui`
+  with the bin `agent-ui`; `.github/workflows/ci.yml` packs the tarball and
+  typechecks a scaffolded consumer under plain Node, so a Bun-only API or a
+  missing `files` entry fails in CI rather than in someone's first `npx`.
 
 Dependencies use Bun isolated installs, so declare packages in the workspace
 where they are used; nothing can rely on root hoisting.
@@ -110,7 +115,7 @@ Do not weaken these constraints.
 3. **Server secrets:** credentials, provider, model, and system prompt are
    server-owned. Browser requests cannot override them or send system roles.
    The `agent` profile (`AgentProfile`: role, audience, voice, goals,
-   behaviors) is part of that server-owned prompt — `formatAgentProfile`
+   behaviors) is part of that server-owned prompt. `formatAgentProfile`
    renders it as *trusted* instructions above the delimited context, so it may
    only ever be populated from consumer server code, never from the request.
 4. **Navigation:** accept only exact manifest routes. Reject schemes, hosts,
@@ -142,7 +147,7 @@ Do not weaken these constraints.
     package manifest. `scripts/dev-real.ts` is neutral; its adapter install and
     generated `*.local.ts` module remain uncommitted.
 13. **Distribution allowlist:** templates contain only declared runtime files
-    and dependencies—never apps, tests, fixtures, screenshots, env files,
+    and dependencies, never apps, tests, fixtures, screenshots, env files,
     development manifests, or provider-specific artifacts.
 14. **Replay revalidates:** replay only originally successful built-in client
     actions (`navigate`, `highlight`, and `interact`), never server tools,
@@ -159,7 +164,7 @@ Do not weaken these constraints.
   work in all shells. Variant-only behavior is presentational or input-specific.
 - `<AgentChat>` is the default wrapper. `<AgentProvider>` plus `AgentHeader`,
   `AgentBody`, `AgentMessages`, `AgentInput`, actions, and shells form the
-  composable API. Parts read `useAgentContext` directly — there is no internal
+  composable API. Parts read `useAgentContext` directly, so there is no internal
   prop-taking layer to thread new props through; do not prop-drill chat state.
   `LauncherButton` owns the collapsed-launcher wiring and a11y contract for
   the dock and sidebar.
@@ -179,13 +184,13 @@ Do not weaken these constraints.
   separator, side, launcher, `starterPrompts`, `selectionSide`), not component
   forks. Cosmetic slots follow the same rule: `AgentMessages` takes
   `emptyState`, `AutoApproveButton` takes children in place of its glyph. Each
-  cosmetic default lives once, in the provider or shell — `AgentChat` forwards
+  cosmetic default lives once, in the provider or shell. `AgentChat` forwards
   `undefined`, never a second copy.
 - `starterPrompts` are contextual task suggestions rendered before the first
   message by `AgentMessages` and the spotlight. They are presentation over
   `agent.sendText`: a starter is an ordinary user turn, so it grants no
   capability a typed message would not. The empty default is the module
-  constant `NO_STARTER_PROMPTS`, not `[]` inline — see identity discipline.
+  constant `NO_STARTER_PROMPTS`, not `[]` inline. See identity discipline.
 - The selection popover attaches to one of four sides (`selectionSide`:
   `top | bottom | left | right`, default `top`). The chosen side is honored,
   never flipped: `selectionAnchor` picks that edge's midpoint and
@@ -212,7 +217,7 @@ Do not weaken these constraints.
 - Identity discipline: `useAgentChat` returns one memoized object and
   `AgentProvider` memoizes the context value keyed on it. Anything added to
   either must be identity-stable (useCallback/useMemo, latest-value refs, or
-  module-constant defaults — never an inline default parameter), or every part
+  module-constant defaults, never an inline default parameter), or every part
   re-renders on every provider render. `MarkdownContent` is memoized on its
   text; message re-parsing must never scale with stream chunks.
 - `styles.css` stays plain CSS. Theme through `--agent-*` tokens with light and
@@ -223,13 +228,13 @@ Do not weaken these constraints.
 The playground is a demo *and* the feature inventory: if a registry capability
 cannot be reached from the panel or a URL, nobody will find it.
 
-- **Two halves, no bleed.** `src/site/` is the gym's own site — chrome, pages,
+- **Two halves, no bleed.** `src/site/` is the gym's own site: chrome, pages,
   copy, and `data-agent-target`s, with no dev knobs anywhere in it. `src/config/`
   is the dev surface. `site/` never imports from `config/`; `config/` imports
   only `manifest.ts`, for the page list. Keeping the split is what makes a
   recording of the page look like a recording of a product.
 - **One config object.** `PlaygroundConfig` in `config/playground-config.ts`
-  holds every knob, including panel visibility — none of it is component-local
+  holds every knob, including panel visibility. None of it is component-local
   state. `CODECS` is a mapped type over that interface, so adding a field is a
   compile error until it has a query-string representation. Serialize only
   what differs from `DEFAULT_CONFIG`, and parse leniently: a hand-edited URL
@@ -240,18 +245,19 @@ cannot be reached from the panel or a URL, nobody will find it.
 - **The panel is Tweakpane, so React stays the source of truth.** The pane is
   constructed once against a mutable draft; bindings lift changes up through
   `onConfigChange`; external changes flow back through `pane.refresh()` behind
-  the `syncing` guard. Callbacks reach the pane through latest-value refs — it
-  must never close over a stale one.
+  the `syncing` guard. Callbacks reach the pane through latest-value refs, and
+  it must never close over a stale one.
 - **`tweakpane` and `@tweakpane/core` are playground devDependencies only.**
   Neither may appear in `registry/` or the CLI templates; see invariant 13.
-- **Real router.** `src/router.ts` owns route and config in the URL — route in
+- **Real router.** `src/router.ts` owns route and config in the URL: route in
   the path, knobs in the query. `navigate` is what the navigate tool drives, so
   route changes are real history entries and the back button works.
 - **Four colors.** The fixture palette is basalt `#171614`, sand `#9A8873`, moss
   `#37423D`, and white; everything else is a mix of those. Square corners,
-  hairline rules, no gradients. Sand is 3.4:1 on white — display type only. For
-  small text use `text-accent-ink` (`--accent-ink`, sand walked toward basalt
-  until it clears AA) on light surfaces, and near-white on moss. Theme-aware
+  hairline rules, no gradients. Sand is 3.4:1 on white, so display type only.
+  For small text use `text-accent-ink` (`--accent-ink`, sand walked toward
+  basalt until it clears AA) on light surfaces, and near-white on moss.
+  Theme-aware
   aliases (`paper`, `ink`, `subtle`, `panel`, `rule`, `accent-ink`) resolve
   through CSS variables, so pages need almost no `dark:` variants and the two
   themes cannot drift. The `--agent-*` tokens map to the same palette and must
@@ -290,7 +296,7 @@ cannot be reached from the panel or a URL, nobody will find it.
   `transitionend`; width and height finish together. Ignore bubbled child
   transitions and do not unmount on the first arbitrary transition event.
 - Focus restoration must run after the launcher remount commit, not directly
-  in a close handler. Use the lifecycle hook's `restoreFocusTo` — all three
+  in a close handler. Use the lifecycle hook's `restoreFocusTo`, which all three
   shells do: dock/sidebar pass their launcher ref, the spotlight passes the
   element its shortcut handler captured. Do not add a shell-local restore path.
 - `.agent-glass` intentionally has no border or box-shadow: combining either
@@ -316,7 +322,7 @@ cannot be reached from the panel or a URL, nobody will find it.
   every inherited method (`addFolder`, `on`, `refresh`) under `skipLibCheck`.
 - Tweakpane's `pane.refresh()` re-emits `change` for every binding it syncs, so
   a handler with side effects fires on programmatic updates as well as user
-  edits. `control-panel.tsx` guards this with a `syncing` ref — without it,
+  edits. `control-panel.tsx` guards this with a `syncing` ref. Without it,
   syncing the route binding navigates again and pushes a duplicate history
   entry.
 - The playground's route lives in `window.history`, so anything that calls
@@ -336,7 +342,7 @@ cannot be reached from the panel or a URL, nobody will find it.
   `components/selection-popover.test.tsx`.
 - Real browser/streaming/tool flows: `apps/playground/e2e/*.e2e.ts` with the
   deterministic mock. Keep the `.e2e.ts` suffix so Bun does not collect them.
-  The suite boots its own Vite on port 5183 — never 5173, so it cannot reuse
+  The suite boots its own Vite on port 5183, never 5173, so it cannot reuse
   a running dev/dev-real server and silently test against a real provider. It
   reuses an already-running 5183 server, so kill any manual one first or the
   suite tests a stale module graph. Replay coverage must assert that no new
@@ -345,7 +351,7 @@ cannot be reached from the panel or a URL, nobody will find it.
   never by driving the control panel. Tests stay independent of Tweakpane's DOM
   and exercise the same URL path a demo setup uses. Reach for the panel only
   when the panel itself is under test.
-- Anything keyboard-driven must first wait on a rendered affordance — the
+- Anything keyboard-driven must first wait on a rendered affordance: the
   spotlight's `.agent-spotlight-hint`, a launcher, a dialog. A key pressed
   between `goto` and React attaching its listener is silently dropped, which
   looks like a broken shortcut.
@@ -360,7 +366,7 @@ includes it first, then adds documents by deterministic lexical score
 (title ×4, keywords ×3, description ×2, body capped at 5 per term) under a
 40,000-character budget, truncating deterministically. The server-executed
 `search_content` tool retrieves further excerpts when that context is not
-enough — it reads the same server manifest, so it needs no client tool policy.
+enough. It reads the same server manifest, so it needs no client tool policy.
 Consumers author this by hand today, but describe each page only once: they
 write the browser-safe `AgentPublicManifest` (routes + target ids), then
 `withContent(publicManifest, contentByRoute)` builds the server-only
@@ -377,6 +383,6 @@ throws on a content key that is not a manifest route.
 Only the *authoring* half is planned. Content will default to
 `<project-root>/content/agent`; front matter will require unique `title`,
 `description`, and relative `route`, with optional `keywords` and unique
-per-route targets, and `agent sync` will generate the public manifest and the
+per-route targets, and `agent-ui sync` will generate the public manifest and the
 content map from it.
 Vector retrieval is out of V1 scope.

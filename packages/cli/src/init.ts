@@ -1,5 +1,5 @@
 /**
- * `agent init` — copy the bundled templates into the consumer's repo, write
+ * `agent-ui init` — copy the bundled templates into the consumer's repo, write
  * `.agent.json`, and add agent-ui's runtime dependencies to their package.json.
  * All IO lives here; the decisions are in `lib.ts`.
  */
@@ -34,6 +34,8 @@ const templatesRoot = fileURLToPath(new URL("../templates", import.meta.url));
 
 interface TemplateManifest {
   dependencies: Record<string, string>;
+  /** Type packages the templates need to compile; merged into devDependencies. */
+  devDependencies: Record<string, string>;
 }
 
 function walkFiles(root: string): string[] {
@@ -87,14 +89,14 @@ export async function runInit(argv: string[], cliVersion: string): Promise<void>
   const manifestPath = join(templatesRoot, "manifest.json");
   if (!existsSync(templatesDir) || !existsSync(manifestPath)) {
     throw new CliError(
-      "Bundled templates are missing — this install of @agent-ui/cli is corrupted; reinstall it.",
+      "Bundled templates are missing — this install of @tuann72/agent-ui is corrupted; reinstall it.",
     );
   }
 
   const pkgPath = join(cwd, "package.json");
   if (!existsSync(pkgPath)) {
     throw new CliError(
-      "No package.json here — run `agent init` from your project root.",
+      "No package.json here — run `agent-ui init` from your project root.",
     );
   }
   const configPath = join(cwd, ".agent.json");
@@ -129,7 +131,7 @@ export async function runInit(argv: string[], cliVersion: string): Promise<void>
     );
   }
 
-  // Copy templates and record install-time hashes for the future `agent update`.
+  // Copy templates and record install-time hashes for the future `agent-ui update`.
   const hashes: Record<string, string> = {};
   for (const source of walkFiles(templatesDir)) {
     const rel = relative(templatesDir, source).split("\\").join("/");
@@ -158,25 +160,31 @@ export async function runInit(argv: string[], cliVersion: string): Promise<void>
   const rawPkg = readFileSync(pkgPath, "utf8");
   const pkg = JSON.parse(rawPkg) as Record<string, unknown>;
   const merge = mergeDependencies(pkg, wanted);
-  if (Object.keys(merge.added).length > 0) {
+  // Type packages land in devDependencies, so a consumer without @types/node
+  // can still typecheck the server/node.ts bridge the CLI just wrote.
+  const devMerge = mergeDependencies(
+    merge.pkg,
+    manifest.devDependencies,
+    "devDependencies",
+  );
+  const added = { ...merge.added, ...devMerge.added };
+  const kept = [...merge.kept, ...devMerge.kept];
+  if (Object.keys(added).length > 0) {
     const indent = rawPkg.match(/^\{\n([ \t]+)/)?.[1] ?? "  ";
-    writeFileSync(pkgPath, JSON.stringify(merge.pkg, null, indent) + "\n");
+    writeFileSync(pkgPath, JSON.stringify(devMerge.pkg, null, indent) + "\n");
   }
 
-  const hasReact = Boolean(
-    merge.pkg.dependencies &&
-      (merge.pkg.dependencies as Record<string, string>).react,
-  );
+  const hasReact = Boolean(devMerge.pkg.dependencies?.react);
   const pm = detectPackageManager(readdirSync(cwd));
 
   console.log(`\nAgent scaffolded into ${dir} (${fileCount} files).`);
   console.log("Wrote .agent.json (paths, provider, install-time file hashes).");
-  const addedNames = Object.keys(merge.added);
+  const addedNames = Object.keys(added);
   if (addedNames.length > 0) {
     console.log(`Added to package.json: ${addedNames.join(", ")}.`);
   }
-  if (merge.kept.length > 0) {
-    console.log(`Already in your package.json (left untouched): ${merge.kept.join(", ")}.`);
+  if (kept.length > 0) {
+    console.log(`Already in your package.json (left untouched): ${kept.join(", ")}.`);
   }
   if (!hasReact) {
     console.log("\n⚠ No react dependency found — agent-ui requires React 19.");

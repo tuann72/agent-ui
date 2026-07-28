@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+
+      # The verification ladder from AGENTS.md, in order.
+      - run: bun run typecheck
+      - run: bun test
+
+      - run: bunx playwright install --with-deps chromium
+      - run: bun run test:e2e
+
+  # The published tarball is only as good as its prepack. Build it the way npm
+  # will, then run the packed CLI under plain Node — no Bun, no workspace — so a
+  # Bun-only API or a missing `files` entry fails here instead of in a consumer's
+  # first `npx`.
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: bun install --frozen-lockfile
+
+      - name: Pack
+        working-directory: packages/cli
+        run: npm pack --pack-destination "$RUNNER_TEMP"
+
+      - name: Scaffold into a clean project with the packed tarball
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/consumer"
+          cd "$RUNNER_TEMP/consumer"
+          npm init -y >/dev/null
+          npm pkg set dependencies.react="^19.2.7" >/dev/null
+          npm install --no-audit --no-fund "$RUNNER_TEMP"/*.tgz
+          npx agent-ui --version
+          npx agent-ui init --yes
+
+      - name: The scaffolded source must typecheck on its own
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/consumer"
+          npm install --no-audit --no-fund
+          npm install --no-audit --no-fund -D typescript@5
+          cat > tsconfig.json <<'JSON'
+          {
+            "compilerOptions": {
+              "target": "ES2022",
+              "lib": ["ES2023", "DOM", "DOM.Iterable"],
+              "module": "ESNext",
+              "moduleResolution": "bundler",
+              "jsx": "react-jsx",
+              "strict": true,
+              "noEmit": true,
+              "skipLibCheck": true,
+              "verbatimModuleSyntax": true,
+              "noUnusedLocals": true,
+              "noUnusedParameters": true,
+              "noUncheckedIndexedAccess": true
+            },
+            "include": ["src"]
+          }
+          JSON
+          npx tsc -p .

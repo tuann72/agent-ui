@@ -1,6 +1,6 @@
 import type { AgentPublicManifest } from "@agent-ui/registry";
 
-/** In a real project `agent sync` generates this from content/agent/*.md. */
+/** In a real project `agent-ui sync` generates this from content/agent/*.md. */
 export const publicManifest: AgentPublicManifest = {
   routes: [
     {

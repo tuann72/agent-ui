@@ -1,6 +1,6 @@
 /**
- * @agent-ui/cli entry point. Bundled to dist/index.js by `bun build
- * --target=node` and executed through bin/agent.js under plain Node — no Bun
+ * @tuann72/agent-ui entry point. Bundled to dist/index.js by `bun build
+ * --target=node` and executed through bin/agent-ui.js under plain Node — no Bun
  * APIs and no runtime dependencies may be used anywhere in src/.
  */
 
@@ -8,10 +8,10 @@ import { readFileSync } from "node:fs";
 import { runInit } from "./init";
 import { CliError } from "./lib";
 
-const HELP = `agent — scaffold the Agent assistant into your React project
+const HELP = `agent-ui — scaffold the Agent assistant into your React project
 
 Usage:
-  npx @agent-ui/cli init [options]
+  npx @tuann72/agent-ui@latest init [options]
 
 Options for init:
   --dir <path>        Where to copy the agent-ui source (default: src/agent)
@@ -48,7 +48,7 @@ try {
     case "doctor":
     case "update":
       console.error(
-        `agent ${command} is planned but not available yet — only \`agent init\` ships today.`,
+        `agent-ui ${command} is planned but not available yet — only \`agent-ui init\` ships today.`,
       );
       process.exit(1);
       break;

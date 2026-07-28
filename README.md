@@ -24,18 +24,19 @@ Open <http://localhost:5173>. Vite serves both the site and the deterministic
 mock API at `/api/agent`; no key, second process, or port 8787 is needed.
 
 The fixture site is Basalt Bouldering Co., a fictional climbing gym. Its copy is
-AI generated and its photography is licensed stock — `/credits` says so plainly
-and attributes every photograph, and the footer repeats the disclosure on every
-page. It is built to exercise the whole feature surface: two `interactive`
-targets on different routes for the approval flow, contextual starter prompts
-per page, a hero photo that shows why `highlightOptions` exists, and light and
-dark themes over the same four-color palette. It also demonstrates the dock's
-continuous launcher-to-panel transition, selection context that can be queued
-without opening Agent, and grouped client actions that can be replayed locally.
+AI generated and its photography is licensed stock. The `/credits` page says so
+plainly and attributes every photograph, and the footer repeats the disclosure
+on every page. It is built to exercise the whole feature surface: two
+`interactive` targets on different routes for the approval flow, contextual
+starter prompts per page, a hero photo that shows why `highlightOptions` exists,
+and light and dark themes over the same four-color palette. It also demonstrates
+the dock's continuous launcher-to-panel transition, selection context that can
+be queued without opening Agent, and grouped client actions that can be replayed
+locally.
 
 #### Control panel
 
-Every knob lives in a Tweakpane panel behind the tab on the **left edge** —
+Every knob lives in a Tweakpane panel behind the tab on the **left edge**:
 shell variant, appearance, side, launcher, title, header, starter prompts,
 selection popover, all three tool policies, per-turn caps, highlight theming,
 page, and theme. Click the tab or press `h` to collapse it, which leaves the
@@ -104,9 +105,12 @@ artifacts out of committed manifests. `Ctrl-C` stops the site and API together.
 ### 1. Scaffold
 
 ```bash
-npx @agent-ui/cli init --provider google
-# or: bunx @agent-ui/cli init --provider google
+npx @tuann72/agent-ui@latest init --provider google
+# or: bunx @tuann72/agent-ui@latest init --provider google
 ```
+
+Keep the `@latest`: the templates ship inside the versioned CLI, so a cached
+older CLI scaffolds older source without saying so.
 
 The CLI copies the agent-ui source into `src/agent`, writes `.agent.json`, and
 adds the required AI SDK v5 dependencies without replacing ranges already in
@@ -135,13 +139,13 @@ import `./agent/tailwind.css` for token-backed utilities.
 
 ### 3. Define site knowledge
 
-Until `agent sync` ships, describe your pages in one browser-safe manifest, then
-add the markdown in a second, server-only file. Each page is written once: the
-routes, titles, descriptions, and targets live in the public manifest, and
+Until `agent-ui sync` ships, describe your pages in one browser-safe manifest,
+then add the markdown in a second, server-only file. Each page is written once:
+the routes, titles, descriptions, and targets live in the public manifest, and
 `withContent` carries them into the server manifest for you.
 
 ```ts
-// src/manifest.ts — browser-safe, the single description of your pages
+// src/manifest.ts: browser-safe, the single description of your pages
 import type { AgentPublicManifest } from "./agent";
 
 export const publicManifest: AgentPublicManifest = {
@@ -164,7 +168,7 @@ export const publicManifest: AgentPublicManifest = {
 ```
 
 ```ts
-// src/manifest.server.ts — server-only
+// src/manifest.server.ts: server-only
 import { withContent } from "./agent/server";
 import { publicManifest } from "./manifest";
 
@@ -177,7 +181,7 @@ export const serverManifest = withContent(publicManifest, {
 ```
 
 Markdown bodies must never reach the browser, which is why the content is added
-here rather than derived the other way — only this server-only module references
+here rather than derived the other way. Only this server-only module references
 it. Every route in the public manifest becomes a document, so the pages the model
 knows about and the pages the browser will allow are always the same set. A key
 that is not a route in the public manifest throws, so a typo cannot silently
@@ -200,7 +204,7 @@ deterministic lexical match on their question, up to a 40,000-character budget.
 When that is not enough, the model can call the server-side `search_content`
 tool for more excerpts. All of it is delimited and labeled untrusted, so
 instructions embedded in your markdown are treated as data, not commands. The
-manifests above are the only input — nothing is crawled from the live DOM.
+manifests above are the only input, and nothing is crawled from the live DOM.
 
 ### 4. Add the server route
 
@@ -227,7 +231,7 @@ Vite SPAs have no server routes, so mount agent-ui as development middleware wit
 the included Node bridge:
 
 ```ts
-// src/agent-api.ts — server-only; never import from browser code
+// src/agent-api.ts: server-only, never import this from browser code
 import { google } from "@ai-sdk/google";
 import { createAgentHandler } from "./agent/server";
 import { toNodeHandler } from "./agent/server/node";
@@ -281,8 +285,9 @@ Never use a browser-exposed `VITE_` or `NEXT_PUBLIC_` prefix for provider keys.
 
 ### 5. Give the assistant an identity (optional)
 
-Persona and operating instructions are server-owned — the browser can never send
-them. Pass a structured `agent` profile, a free-form `system` string, or both:
+Persona and operating instructions are server-owned, so the browser can never
+send them. Pass a structured `agent` profile, a free-form `system` string, or
+both:
 
 ```ts
 export const POST = createAgentHandler({
@@ -339,7 +344,7 @@ the same primary color, and the brand's horizontal and vertical motion meets
 the collapsed layout without a final alignment snap. Reduced-motion
 preferences skip the transition.
 
-The chosen `selectionSide` is honored rather than flipped — the popover is only
+The chosen `selectionSide` is honored rather than flipped. The popover is only
 nudged back inside the viewport when it would overflow. Its main **Ask Agent**
 segment attaches the selected text and opens the current shell; the adjacent
 plus button attaches the same bounded context without opening anything. Queued
@@ -382,7 +387,7 @@ replayed.
 For custom composition, use `<AgentProvider>` with `AgentDock`, `AgentSidebar`, or
 `AgentSpotlight` and the exported header, body, messages, input, and action
 parts. Every part reads the shared context, so pieces can be dropped, reordered,
-or replaced without wiring props — and without changing core tool enforcement.
+or replaced without wiring props, and without changing core tool enforcement.
 Cosmetic slots follow the same pattern: `AgentMessages` accepts an `emptyState`
 node for the before-first-message copy, and `AutoApproveButton` renders its
 children in place of the default glyph. The prop types (`AgentDockProps`,
@@ -407,7 +412,7 @@ Repository layout:
 | Path | Purpose |
 | --- | --- |
 | `registry/` | Source templates: core, UI shells, styles, server handler |
-| `packages/cli/` | `@agent-ui/cli` initializer and bundled templates |
+| `packages/cli/` | `@tuann72/agent-ui` initializer and bundled templates |
 | `apps/playground/` | Demo site, control panel, mock model, manifests, browser tests |
 | `scripts/dev-real.ts` | Uncommitted real-provider smoke-test launcher |
 
@@ -415,9 +420,9 @@ Repository layout:
 
 Implemented: registry, dock/sidebar/spotlight variants, composable parts,
 continuous dock expansion, split selection-to-chat/context controls, grouped
-local action replay, hardened server handler, Node bridge, `agent init`, mock
+local action replay, hardened server handler, Node bridge, `agent-ui init`, mock
 and real-provider playground paths, unit/component tests, and Playwright tests.
 
-Planned: `agent add`, `sync`, `doctor`, and `update`; generated markdown
+Planned: `agent-ui add`, `sync`, `doctor`, and `update`; generated markdown
 manifests; framework adapters/examples; provider factories; durable rate
 limiting.

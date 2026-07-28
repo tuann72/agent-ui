@@ -1,5 +1,5 @@
 {
-  "name": "@agent-ui/cli",
+  "name": "@tuann72/agent-ui",
   "version": "0.1.0",
   "description": "Scaffold Agent — a portable, shadcn-style AI assistant for React — into your project. Copies the source into your repo; you own it, no runtime dependency on agent-ui.",
   "keywords": [
@@ -21,12 +21,14 @@
   "bugs": "https://github.com/tuann72/agent-ui/issues",
   "type": "module",
   "bin": {
-    "agent": "bin/agent.js"
+    "agent-ui": "bin/agent-ui.js"
   },
   "files": [
     "bin",
     "dist",
-    "templates"
+    "templates",
+    "schema.json",
+    "CHANGELOG.md"
   ],
   "engines": {
     "node": ">=20"

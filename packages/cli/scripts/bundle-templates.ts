@@ -54,10 +54,31 @@ if (count < 10) {
 // what the source actually needs.
 const registryPkg = JSON.parse(
   readFileSync(join(repoRoot, "registry", "package.json"), "utf8"),
-) as { dependencies: Record<string, string> };
+) as { dependencies: Record<string, string>; devDependencies: Record<string, string> };
+
+// Type packages the *templates* need to compile in a consumer's project, as
+// opposed to the registry's test-only devDependencies. `server/node.ts` imports
+// node:http/node:stream, and every component is .tsx — without these a fresh
+// consumer's first `tsc` fails on the code the CLI just wrote for them.
+const TEMPLATE_TYPE_DEPS = ["@types/node", "@types/react"];
+const devDependencies: Record<string, string> = {};
+for (const name of TEMPLATE_TYPE_DEPS) {
+  const range = registryPkg.devDependencies[name];
+  if (range === undefined) {
+    throw new Error(
+      `registry/package.json no longer declares ${name}; templates need its range to stay in step.`,
+    );
+  }
+  devDependencies[name] = range;
+}
+
 writeFileSync(
   join(templatesRoot, "manifest.json"),
-  JSON.stringify({ dependencies: registryPkg.dependencies }, null, 2) + "\n",
+  JSON.stringify(
+    { dependencies: registryPkg.dependencies, devDependencies },
+    null,
+    2,
+  ) + "\n",
 );
 
 console.log(`Bundled ${count} template files from registry/src (+ manifest.json).`);

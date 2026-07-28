@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import {
   addCommand,
+  AGENT_CONFIG_SCHEMA_URL,
   buildAgentConfig,
   detectPackageManager,
   installCommand,
@@ -62,6 +63,32 @@ describe("mergeDependencies", () => {
     const input = { dependencies: { ai: "^5" } };
     mergeDependencies(input, { zod: "^4" });
     expect(input).toEqual({ dependencies: { ai: "^5" } });
+  });
+
+  test("targets devDependencies when asked", () => {
+    const { pkg, added } = mergeDependencies(
+      { dependencies: { react: "^19" } },
+      { "@types/node": "^26.1.1", "@types/react": "^19" },
+      "devDependencies",
+    );
+    expect(pkg.dependencies).toEqual({ react: "^19" });
+    expect(pkg.devDependencies).toEqual({
+      "@types/node": "^26.1.1",
+      "@types/react": "^19",
+    });
+    expect(added).toEqual({ "@types/node": "^26.1.1", "@types/react": "^19" });
+  });
+
+  test("never moves a dep the consumer declared in another section", () => {
+    const { pkg, added, kept } = mergeDependencies(
+      { dependencies: { "@types/node": "^20" } },
+      { "@types/node": "^26.1.1" },
+      "devDependencies",
+    );
+    expect(pkg.dependencies).toEqual({ "@types/node": "^20" });
+    expect(pkg.devDependencies).toBeUndefined();
+    expect(added).toEqual({});
+    expect(kept).toEqual(["@types/node"]);
   });
 });
 
@@ -135,11 +162,34 @@ describe("buildAgentConfig", () => {
       "index.ts": "abc123",
     });
     expect(config).toEqual({
+      $schema: AGENT_CONFIG_SCHEMA_URL,
       cli: "0.1.0",
       dir: "src/agent",
       content: "content/agent",
       provider: "anthropic",
       files: { "index.ts": "abc123" },
     });
+  });
+
+  test("the published schema stays in step with what init writes", () => {
+    const schema = JSON.parse(
+      readFileSync(new URL("../schema.json", import.meta.url), "utf8"),
+    ) as {
+      $id: string;
+      required: string[];
+      properties: Record<string, { enum?: string[] }>;
+    };
+    const config = buildAgentConfig("0.1.0", "src/agent", "none", {});
+    expect(schema.$id).toBe(AGENT_CONFIG_SCHEMA_URL);
+    expect(config.$schema).toBe(AGENT_CONFIG_SCHEMA_URL);
+    for (const key of Object.keys(config)) {
+      expect(Object.keys(schema.properties)).toContain(key);
+    }
+    for (const key of schema.required) {
+      expect(Object.keys(config)).toContain(key);
+    }
+    expect(schema.properties.provider?.enum?.toSorted()).toEqual(
+      [...Object.keys(PROVIDERS), "none"].toSorted(),
+    );
   });
 });

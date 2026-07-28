@@ -1,0 +1,53 @@
+name: Release
+
+# Publishes the CLI when a tag is pushed. Tag the version you already bumped in
+# packages/cli/package.json:
+#
+#   npm --prefix packages/cli version patch   # or minor / major
+#   git commit -am "release: cli vX.Y.Z" && git tag cli-vX.Y.Z && git push --follow-tags
+on:
+  push:
+    tags: ["cli-v*"]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Required for npm provenance: the attestation is signed with a short-lived
+      # OIDC token, so the tarball on npm is verifiably built from this workflow.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      # prepack shells out to `bun run build` to regenerate templates/ and dist/,
+      # so Bun must be on PATH here even though the publish itself is npm's.
+      - run: bun install --frozen-lockfile
+
+      - name: Tag must match the version being published
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#cli-v}"
+          pkg="$(node -p "require('./packages/cli/package.json').version")"
+          if [ "$tag" != "$pkg" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match packages/cli version $pkg" >&2
+            exit 1
+          fi
+        if: github.ref_type == 'tag'
+
+      - run: bun run typecheck
+      - run: bun test
+
+      - name: Publish
+        working-directory: packages/cli
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

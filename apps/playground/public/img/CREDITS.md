@@ -1,9 +1,10 @@
 # Photo credits
 
 Fixture photography for the Basalt Bouldering Co. demo site. All seven photos
-are from Unsplash under the [Unsplash License](https://unsplash.com/license)
-(free to use commercially, no permission or attribution required — credited
-here anyway). Downloaded and size-capped so the playground stays fully offline.
+are from Unsplash under the [Unsplash License](https://unsplash.com/license),
+which allows commercial use without permission or attribution. They are
+credited here anyway. Each file is downloaded and size-capped so the playground
+stays fully offline.
 
 | File | Photographer | Source |
 | --- | --- | --- |

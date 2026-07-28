@@ -82,13 +82,15 @@ export interface DependencyMerge {
 }
 
 /**
- * Add agent-ui's runtime deps to a consumer package.json object. A dependency the
- * consumer already declares anywhere (deps/devDeps/peerDeps) keeps its range —
- * the CLI never overwrites version choices it does not own.
+ * Add agent-ui's deps to a consumer package.json object, into `section`. A
+ * dependency the consumer already declares anywhere (deps/devDeps/peerDeps)
+ * keeps its range — the CLI never overwrites version choices it does not own,
+ * and never moves one between sections.
  */
 export function mergeDependencies(
   pkg: PackageJsonLike,
   wanted: Record<string, string>,
+  section: "dependencies" | "devDependencies" = "dependencies",
 ): DependencyMerge {
   const out = structuredClone(pkg);
   const added: Record<string, string> = {};
@@ -103,7 +105,7 @@ export function mergeDependencies(
     if (declared(name)) {
       kept.push(name);
     } else {
-      out.dependencies = { ...out.dependencies, [name]: range };
+      out[section] = { ...out[section], [name]: range };
       added[name] = range;
     }
   }
@@ -152,15 +154,23 @@ export function noProviderHint(pm: PackageManager): string[] {
   return lines;
 }
 
+/**
+ * Published alongside the CLI so editors can complete and validate `.agent.json`
+ * — the same affordance shadcn's `components.json` gets from its `$schema` key.
+ */
+export const AGENT_CONFIG_SCHEMA_URL =
+  "https://raw.githubusercontent.com/tuann72/agent-ui/main/packages/cli/schema.json";
+
 export interface AgentConfig {
+  $schema: string;
   /** CLI version that scaffolded this install. */
   cli: string;
   /** Where the vendored agent-ui source lives, relative to the project root. */
   dir: string;
-  /** Markdown content directory for `agent sync` (invariant 11 default). */
+  /** Markdown content directory for `agent-ui sync` (invariant 11 default). */
   content: string;
   provider: ProviderId | "none";
-  /** Install-time sha256 per template file, for the future `agent update`. */
+  /** Install-time sha256 per template file, for the future `agent-ui update`. */
   files: Record<string, string>;
 }
 
@@ -170,5 +180,12 @@ export function buildAgentConfig(
   provider: ProviderId | "none",
   files: Record<string, string>,
 ): AgentConfig {
-  return { cli: cliVersion, dir, content: "content/agent", provider, files };
+  return {
+    $schema: AGENT_CONFIG_SCHEMA_URL,
+    cli: cliVersion,
+    dir,
+    content: "content/agent",
+    provider,
+    files,
+  };
 }
