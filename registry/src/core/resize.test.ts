@@ -12,6 +12,21 @@ describe("clampSize", () => {
     // Happens on very narrow viewports where max = innerWidth - margin.
     expect(clampSize(500, 280, 120)).toBe(280);
   });
+
+  test("commits whole pixels", () => {
+    // A pointer produces fractions; a fractional panel box lets its background
+    // and its contents' rounded clip land on different device pixels, showing
+    // the surface as a hairline beside the header.
+    expect(clampSize(400.4, 280, 640)).toBe(400);
+    expect(clampSize(400.6, 280, 640)).toBe(401);
+  });
+
+  test("rounds inside fractional bounds, never past them", () => {
+    // A viewport-derived maximum is itself fractional at fractional scaling.
+    expect(clampSize(639.9, 280.2, 640.4)).toBe(640);
+    expect(clampSize(9999, 280.2, 640.4)).toBe(640);
+    expect(clampSize(0, 280.2, 640.4)).toBe(281);
+  });
 });
 
 describe("growthFromPointer", () => {

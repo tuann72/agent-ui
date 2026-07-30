@@ -533,8 +533,11 @@ Tool defaults are highlight `auto`, navigate `confirm`, and interact `confirm`.
 The auto-approve control can skip confirmation but never re-enable a disabled
 tool. Colors, radius, surfaces, and glass tint use `--agent-*` CSS tokens with
 separate `.dark` values. Retheming means setting those tokens and nothing else:
-the panel-header color and the band behind its rounded corners both derive from
-`--agent-primary`, so they follow a brand change automatically.
+the panel-header color and the band painted behind it both derive from
+`--agent-primary`, so they follow a brand change automatically. The one pairing
+to keep in step is `--agent-header-height` and the header's own height — the band
+is drawn exactly that tall, so that no panel surface shows at the header's edges.
+Resizing a panel commits whole pixels for the same reason.
 
 Completed page actions are grouped in the transcript. The **Replay actions**
 control re-executes the successful built-in client actions in that group
@@ -564,8 +567,8 @@ default glyph. Context hooks cover the rest: `useAgentContext`,
 
 ```bash
 bun run typecheck    # registry, CLI, and playground TypeScript
-bun test             # 192 unit and component-contract tests
-bun run test:e2e     # 20 Chromium flows; starts Vite automatically
+bun test             # 195 unit and component-contract tests
+bun run test:e2e     # 21 Chromium flows; starts Vite automatically
 bun run cli:build    # rebuild CLI output and bundled templates
 ```
 

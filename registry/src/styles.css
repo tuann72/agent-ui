@@ -17,6 +17,9 @@
   --agent-danger: oklch(0.5 0.2 25);
   --agent-danger-border: oklch(0.6 0.2 25);
   --agent-radius: 0.75rem;
+  /* The standard panel header's minimum height. --agent-panel-band is painted
+     exactly this tall, so the two must move together. */
+  --agent-header-height: 2.75rem;
   --agent-selection-radius: 0.625rem;
   --agent-highlight-border-color: var(--agent-accent);
   --agent-highlight-border-width: 2px;
@@ -314,6 +317,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  box-sizing: border-box;
+  /* A floor, not a fixed height: content may make the bar taller, and
+     --agent-panel-band relies on never being taller than the bar it backs. */
+  min-height: var(--agent-header-height);
   padding: 0.625rem 0.875rem;
   /* Translucent so the panel's glass blur still reads through the header. */
   background: color-mix(in oklch, var(--agent-primary) 80%, transparent);
@@ -744,26 +751,36 @@
 }
 
 /*
- * Where a header paints the panel's rounded top corners, the panel's own
- * surface must not be what shows through them.
+ * Behind a panel's header, the panel's own surface must not be what shows.
  *
- * The header is an opaque box with the same corner radius as the panel it sits
- * in, so the two antialias that curve independently: along it the header's
- * paint fades out and the surface behind — near-white in light mode — comes
- * through as a pale arc, one visible light pixel in each top corner. Painting a
- * band of the header's own colour, as tall as the corner, as the panel's
- * topmost background layer removes it: the background layers of one element are
- * composited before that element's edge is antialiased, so a single colour sits
- * behind the corner. A child element cannot do this job, because its own edge
- * antialiases separately — which is exactly the problem.
+ * The header is an opaque box drawn inside a rounded, clipped panel whose
+ * surface is near-white in light mode, and it does not get to assume its edges
+ * line up with the panel's to the device pixel. They do not, in two ways:
  *
- * Only shells whose header is opaque opt in; behind a translucent one the band
- * would read as a darker strip across the top of the header.
+ *   - The corners. Header and panel round the same curve and each antialiases
+ *     it separately, so along the curve the header's paint fades out and the
+ *     surface comes through as a pale arc — one light pixel per top corner.
+ *   - The sides. The panel paints its background while an inner wrapper does
+ *     the rounded overflow clipping, and at fractional or scaled device pixels
+ *     those two edges can land a pixel apart, leaving a hairline of surface
+ *     down the full height of the header.
+ *
+ * Both vanish if the colour behind the header is the header's own. This band is
+ * that colour, painted as tall as the header and as the panel's *topmost
+ * background layer*: the layers of one element are composited before that
+ * element's edge is antialiased, so a single colour sits behind the header's
+ * whole box. A child element cannot do the job — its edge antialiases
+ * separately, which is the problem itself.
+ *
+ * `:has()` scopes this to the standard header, whose colour and minimum height
+ * are ours (--agent-header-height); a consumer's own bar keeps its own colour
+ * and gets no band under it. Only shells whose header is opaque opt in — behind
+ * a translucent one the band would read as a darker strip.
  */
-.agent-dock-panel,
-.agent-sidebar-panel.agent-detached {
+.agent-dock-panel:has(.agent-panel-header),
+.agent-sidebar-panel.agent-detached:has(.agent-panel-header) {
   --agent-panel-band: linear-gradient(
-    var(--agent-primary) var(--agent-radius),
+    var(--agent-primary) var(--agent-header-height),
     transparent 0
   );
 }

@@ -21,7 +21,7 @@ remain in consumer-owned server code.
 - `packages/cli/`: zero-runtime-dependency `@tuann72/agent-ui`. `agent-ui init`
   copies bundled templates, writes `.agent.json` with file hashes, and adds
   required dependencies without replacing consumer ranges.
-- Tests: 192 unit/component tests and 20 Playwright flows.
+- Tests: 195 unit/component tests and 21 Playwright flows.
 
 Not built yet: `agent-ui add`, `sync`, `doctor`, and `update`; markdown
 ingestion; framework adapters/example apps; provider factories; durable rate
@@ -346,13 +346,26 @@ cannot be reached from the panel or a URL, nobody will find it.
 - `.agent-glass` intentionally has no border or box-shadow: combining either
   with `backdrop-filter` causes a pale unfiltered perimeter. Do not add a rim
   or edge without discussing the design. Solid dock panels are also borderless.
-- Two rounded boxes at the same radius each antialias that curve separately, so
-  a header sitting in a panel's rounded top corner lets the panel's surface leak
-  through the corner as a pale arc. `--agent-panel-band` fixes it by painting a
-  header-coloured band, as tall as the corner, as the panel's topmost background
-  *layer* — one element's layers share one edge antialias, so a child or wrapper
-  cannot do this job. Shells that opt in must keep their header opaque and the
-  same colour as the band; an e2e test asserts the two match.
+- A header does not get to assume its edges land on the panel's to the device
+  pixel, and the panel's surface is what shows when they miss. Two rounded boxes
+  at one radius antialias that curve separately (a pale arc in each top corner),
+  and the panel paints its background while `.agent-dock-contents` does the
+  rounded overflow clip, so at fractional or scaled device pixels those two edges
+  can sit a pixel apart (a hairline of surface down the full height of the bar).
+  `--agent-panel-band` answers both by painting the header's own colour, as tall
+  as the header, as the panel's topmost background *layer* — one element's layers
+  share one edge antialias, so a child or wrapper cannot do this job. The band's
+  height is `--agent-header-height`, which the header declares as `min-height` so
+  the two cannot drift; a band taller than the bar would paint a strip below it.
+  `:has(.agent-panel-header)` scopes it to the standard header, whose colour is
+  known — a consumer's own bar gets no band. Shells that opt in must keep their
+  header opaque. An e2e test asserts the band's colour and height match the
+  header's.
+- Committed panel sizes and detached positions are whole pixels (`clampSize`,
+  `clampPosition`). Fractional geometry is what lets a panel's background and its
+  contents' clip round apart in the first place, and for the sidebar the width is
+  also the page's push margin, which must not round away from the panel's edge.
+  Round at those two funnels, not at call sites.
 - Agent layers on a fixed z-scale: highlight overlay 30 < dock/sidebar 40 <
   spotlight 50 < selection popover 70. The overlay marks page content and must
   stay below every Agent surface.
