@@ -122,6 +122,7 @@ function Host({
   inputSeparator,
   starterPrompts,
   toolPolicy,
+  detachable,
 }: {
   variant: AgentVariant;
   onNavigate?: (route: string) => void;
@@ -133,6 +134,7 @@ function Host({
   inputSeparator?: boolean;
   starterPrompts?: readonly { label: string; prompt: string }[];
   toolPolicy?: Partial<AgentToolPolicies>;
+  detachable?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -145,6 +147,7 @@ function Host({
       icon={icon}
       starterPrompts={starterPrompts}
       toolPolicy={toolPolicy}
+      detachable={detachable}
       open={open}
       onOpenChange={setOpen}
     >
@@ -499,6 +502,87 @@ for (const driver of drivers.slice(0, 2)) {
       render(<Host variant={driver.variant} inputSeparator={false} />);
       await openPanel(driver);
       expect(getPanel().className).toContain("agent-no-separator");
+    });
+  });
+}
+
+// The dock and sidebar share one detach implementation, so they share its
+// contract. The spotlight is already a centered overlay and offers none of it.
+for (const driver of drivers.filter((d) => d.variant !== "spotlight")) {
+  describe(`${driver.variant} detach`, () => {
+    /** The element the shells position while floating. */
+    const detachedElement = () =>
+      document.querySelector(".agent-detached") as HTMLElement | null;
+
+    test("no detach control unless the shell is detachable", async () => {
+      render(<Host variant={driver.variant} />);
+      await openPanel(driver);
+      expect(screen.queryByRole("button", { name: /detach/i })).toBeNull();
+    });
+
+    test("detaching marks the panel floating and offers the way back", async () => {
+      render(<Host variant={driver.variant} detachable />);
+      await openPanel(driver);
+      expect(detachedElement()).toBeNull();
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "Detach chat panel" }),
+      );
+      await waitFor(() => expect(detachedElement()).toBeTruthy());
+      const attach = screen.getByRole("button", { name: "Attach chat panel" });
+      expect(attach.getAttribute("aria-pressed")).toBe("true");
+
+      fireEvent.click(attach);
+      await waitFor(() => expect(detachedElement()).toBeNull());
+    });
+
+    test("the header is a drag handle only while detached", async () => {
+      render(<Host variant={driver.variant} detachable />);
+      await openPanel(driver);
+      const header = () =>
+        document.querySelector(".agent-panel-header") as HTMLElement;
+      expect(header().hasAttribute("data-agent-drag")).toBe(false);
+      fireEvent.click(
+        screen.getByRole("button", { name: "Detach chat panel" }),
+      );
+      await waitFor(() =>
+        expect(header().hasAttribute("data-agent-drag")).toBe(true),
+      );
+    });
+
+    test("closing re-attaches, so reopening starts docked", async () => {
+      render(<Host variant={driver.variant} detachable />);
+      await openPanel(driver);
+      fireEvent.click(
+        screen.getByRole("button", { name: "Detach chat panel" }),
+      );
+      await waitFor(() => expect(detachedElement()).toBeTruthy());
+
+      fireEvent.click(screen.getByRole("button", { name: "Close chat" }));
+      endExitAnimation();
+      await waitFor(() => expect(queryPanel()).toBeNull());
+
+      await openPanel(driver);
+      expect(detachedElement()).toBeNull();
+      expect(
+        screen.getByRole("button", { name: "Detach chat panel" }),
+      ).toBeTruthy();
+    });
+
+    test("header controls still work while detached", async () => {
+      render(<Host variant={driver.variant} detachable />);
+      await openPanel(driver);
+      fireEvent.click(
+        screen.getByRole("button", { name: "Detach chat panel" }),
+      );
+      await waitFor(() => expect(detachedElement()).toBeTruthy());
+      // A title-bar drag must not swallow the buttons sitting inside it.
+      const toggle = screen.getByRole("switch", {
+        name: "Automatically approve Agent's page actions",
+      });
+      fireEvent.pointerDown(toggle, { button: 0, pointerId: 1 });
+      fireEvent.click(toggle);
+      expect(toggle.getAttribute("aria-checked")).toBe("true");
     });
   });
 }

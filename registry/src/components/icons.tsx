@@ -97,6 +97,46 @@ export function PlusIcon({ size = 14 }: IconProps) {
   );
 }
 
+/** Detach: a panel lifting away from the edge it was pinned to. */
+export function DetachIcon({ size = 14 }: IconProps) {
+  return (
+    <svg
+      aria-hidden="true"
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M7 2.5H3.5A1 1 0 0 0 2.5 3.5v9a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V9" />
+      <path d="M9.5 2.5h4v4M13.5 2.5L8 8" />
+    </svg>
+  );
+}
+
+/** Re-attach: the floating panel returning into its frame. */
+export function AttachIcon({ size = 14 }: IconProps) {
+  return (
+    <svg
+      aria-hidden="true"
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="2.5" y="2.5" width="11" height="11" rx="1" />
+      <path d="M2.5 10h11" />
+    </svg>
+  );
+}
+
 export function RefreshIcon({ size = 14 }: IconProps) {
   return (
     <svg

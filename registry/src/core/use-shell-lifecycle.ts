@@ -32,6 +32,13 @@ export interface ShellLifecycle {
   panelAnimationEnd: (event: ReactAnimationEvent<HTMLElement>) => void;
   /** Transition-based shells use the same lifecycle completion contract. */
   panelTransitionEnd: (event: ReactTransitionEvent<HTMLElement>) => void;
+  /**
+   * Complete the exit now. The event handlers above are the usual paths, but a
+   * shell that can tell no animation or transition will run (the dock, when a
+   * close begins before its frame has grown) must be able to finish without
+   * waiting for an event the browser will never send.
+   */
+  finishClose: () => void;
 }
 
 /**
@@ -77,11 +84,17 @@ export function useShellLifecycle({
     onOpenChange(false);
   };
 
+  const finishClose = () => {
+    if (closing) setClosing(false);
+  };
+  // Both event paths funnel through finishClose, and both ignore bubbled child
+  // events: a descendant finishing its own animation says nothing about the
+  // panel's exit.
   const panelAnimationEnd = (event: ReactAnimationEvent<HTMLElement>) => {
-    if (closing && event.target === event.currentTarget) setClosing(false);
+    if (event.target === event.currentTarget) finishClose();
   };
   const panelTransitionEnd = (event: ReactTransitionEvent<HTMLElement>) => {
-    if (closing && event.target === event.currentTarget) setClosing(false);
+    if (event.target === event.currentTarget) finishClose();
   };
 
   // Escape closes from anywhere on the page while the panel is open.
@@ -108,5 +121,6 @@ export function useShellLifecycle({
     close,
     panelAnimationEnd,
     panelTransitionEnd,
+    finishClose,
   };
 }

@@ -2,8 +2,20 @@
 
 import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from "react";
 
-/** Directional cursor held page-wide for the length of a drag. */
-export type ResizeCursor = "nwse" | "nesw" | "ew" | "ns";
+/**
+ * Cursor held page-wide for the length of a drag. `move` is the detached
+ * panel's title-bar drag, which needs the same plumbing as a resize edge and so
+ * shares this hook rather than reimplementing pointer capture.
+ */
+export type ResizeCursor = "nwse" | "nesw" | "ew" | "ns" | "move";
+
+/** Pointer handlers for one drag surface: a resize edge, or a drag handle. */
+export interface AgentPointerDragProps {
+  onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
+  onPointerMove: (event: ReactPointerEvent<HTMLElement>) => void;
+  onPointerUp: (event: ReactPointerEvent<HTMLElement>) => void;
+  onPointerCancel: (event: ReactPointerEvent<HTMLElement>) => void;
+}
 
 /**
  * Pointer-drag plumbing shared by every resize handle.
@@ -43,7 +55,10 @@ export function useResizeDrag(onStart: () => void) {
    * keeps moves on the element that started the drag, so the right one always
    * runs without needing to be stashed at pointer-down.
    */
-  return (cursor: ResizeCursor, onDelta: (dx: number, dy: number) => void) => ({
+  return (
+    cursor: ResizeCursor,
+    onDelta: (dx: number, dy: number) => void,
+  ): AgentPointerDragProps => ({
     onPointerDown(event: ReactPointerEvent<HTMLElement>) {
       if (event.button !== 0) return;
       const cls = `agent-resizing-${cursor}`;

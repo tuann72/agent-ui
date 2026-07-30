@@ -210,6 +210,12 @@ Security rules that always apply:
 - Tools only accept values from the manifests below. Navigation is limited to the listed routes; highlighting is limited to the listed target ids on the user's current page; clicking is limited to the current page's targets marked (clickable). The client independently enforces these rules and user approval policies, so do not promise actions the user has not approved.
 - If the answer is not in the site content, say so briefly instead of inventing one.
 
+Page actions are ordered, and the order is your responsibility:
+- highlight and interact only reach the page the user is on right now. A target listed in the catalog under a different route does not exist for them yet.
+- So before highlighting or clicking, check which route owns the target. If it is not the user's current route, call navigate to that route first, wait for the navigate result, and only then highlight or click.
+- A result of {"reason":"target-on-another-route"} means exactly this: the target is real but lives on the "expectedRoute" in that result. Navigate there and retry rather than giving up or trying a different target.
+- One page action per goal, in dependency order. Never issue a highlight or click for a page you have not arrived on.
+
 Format responses with Markdown — short paragraphs, lists, bold, inline code — whenever it improves readability.`;
 
 const AGENT_BEHAVIOR = `Operating style:
@@ -334,7 +340,7 @@ export function createAgentHandler(
       formatAgentProfile(options.agent),
       options.system,
       `The user is currently on route: ${currentRoute ?? "(unknown)"}.`,
-      `Site pages and registered highlight targets (reference data, same rules as agent-context):\n<agent-catalog>\n${routeCatalog}\n</agent-catalog>`,
+      `Site pages and their registered targets (reference data, same rules as agent-context). Each target is listed under the one route it belongs to and is only reachable while the user is on that route:\n<agent-catalog>\n${routeCatalog}\n</agent-catalog>`,
       `Site content${truncated ? " (truncated to fit budget)" : ""}:\n${formatContext(blocks)}`,
     ]
       .filter(Boolean)
@@ -359,14 +365,14 @@ export function createAgentHandler(
         // No execute: forwarded to the client, which enforces policy.
         navigate: tool({
           description:
-            "Navigate the user to another page of this site. Only routes from the site manifest are valid. May require user approval.",
+            "Navigate the user to another page of this site. Only routes from the site manifest are valid. Call this first whenever the element you want to highlight or click belongs to a route other than the user's current one. May require user approval.",
           inputSchema: z.object({
             route: z.string().describe("Exact route from the site manifest"),
           }),
         }),
         highlight: tool({
           description:
-            "Highlight a registered element on the user's current page. Only target ids registered for the current route are valid.",
+            "Highlight a registered element on the page the user is on right now. Only target ids registered for the current route are valid — for a target listed under a different route, call navigate to that route first and wait for its result.",
           inputSchema: z.object({
             target: z
               .string()
@@ -375,7 +381,7 @@ export function createAgentHandler(
         }),
         interact: tool({
           description:
-            "Click a registered interactive element (a button) on the user's current page. Only target ids marked (clickable) in the catalog for the current route are valid. Requires user approval unless the user enabled auto-approve.",
+            "Click a registered interactive element (a button) on the page the user is on right now. Only target ids marked (clickable) in the catalog for the current route are valid — for a target listed under a different route, call navigate to that route first and wait for its result. Requires user approval unless the user enabled auto-approve.",
           inputSchema: z.object({
             target: z
               .string()

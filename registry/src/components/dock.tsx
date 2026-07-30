@@ -15,6 +15,7 @@ import {
   keyboardResizeDelta,
   type AgentSide,
 } from "../core/resize";
+import { useDetachedPanel } from "../core/use-detach";
 import { useResizeDrag } from "../core/use-resize-drag";
 import { useShellLifecycle } from "../core/use-shell-lifecycle";
 import type { ReactNode } from "react";
@@ -49,7 +50,8 @@ export function AgentDock({
   inputSeparator = true,
   children,
 }: AgentDockProps) {
-  const { open, setOpen, title, icon, appearance } = useAgentContext();
+  const { open, setOpen, detached, title, icon, appearance } =
+    useAgentContext();
   const [size, setSize] = useState(DEFAULT_DOCK_SIZE);
   const [launcherSize, setLauncherSize] = useState(FALLBACK_LAUNCHER_SIZE);
   const [opening, setOpening] = useState(false);
@@ -68,16 +70,35 @@ export function AgentDock({
     close,
     panelAnimationEnd,
     panelTransitionEnd,
+    finishClose,
   } = useShellLifecycle({
     open,
     onOpenChange: setOpen,
     restoreFocusTo: launcherRef,
   });
   useFocusTrap(panelRef, showPanel);
+  const { positionStyle, dragHandleProps } = useDetachedPanel({
+    detached,
+    elementRef: frameRef,
+  });
 
   useLayoutEffect(() => {
     if (opening && motionDisabled()) setOpening(false);
   }, [opening]);
+
+  // The exit is driven by the frame's height transition, and a transition only
+  // exists when the height actually changes. Close before the frame has grown —
+  // Escape while it is still opening — and the target height is the one it is
+  // already at, so the browser starts nothing and no transitionend ever
+  // arrives. Reading the height here, after the closing commit, reports the
+  // pre-transition value: equal to the launcher means there is no exit to wait
+  // for, and the panel would otherwise stay mounted forever.
+  useLayoutEffect(() => {
+    if (!closing) return;
+    const height = frameRef.current?.getBoundingClientRect().height;
+    if (height === undefined) return;
+    if (Math.abs(height - launcherSize.height) < 0.5) finishClose();
+  }, [closing, launcherSize.height, finishClose]);
 
   const sideClass = side === "left" ? "agent-dock-left" : "agent-dock-right";
 
@@ -144,6 +165,9 @@ export function AgentDock({
   const frameStyle = {
     width: frameSize.width,
     height: frameSize.height,
+    // Detached, the frame is placed in viewport coordinates. Until the first
+    // drag the stylesheet owns the resting spot, so no offsets are written.
+    ...positionStyle,
   } satisfies CSSProperties;
 
   return (
@@ -153,7 +177,7 @@ export function AgentDock({
       data-state={
         closing ? "closing" : showPanel ? (opening ? "opening" : "open") : "closed"
       }
-      className={`agent-dock-frame ${sideClass}`}
+      className={`agent-dock-frame ${sideClass}${detached ? " agent-detached" : ""}`}
       style={frameStyle}
       onTransitionEnd={(event) => {
         // Width and height end together. Key lifecycle completion to height so
@@ -202,7 +226,11 @@ export function AgentDock({
             {...sideEdge}
           />
           <div className="agent-dock-contents">
-            <AgentPanelContents close={close} header={header}>
+            <AgentPanelContents
+              close={close}
+              dragHandleProps={detached ? dragHandleProps : null}
+              header={header}
+            >
               {children}
             </AgentPanelContents>
           </div>

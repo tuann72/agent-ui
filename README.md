@@ -38,9 +38,9 @@ locally.
 
 Every knob lives in a Tweakpane panel behind the tab on the **left edge**:
 shell variant, appearance, side, launcher, title, header, starter prompts,
-selection popover, all three tool policies, per-turn caps, highlight theming,
-page, and theme. Click the tab or press `h` to collapse it, which leaves the
-page looking like an ordinary site for screenshots and screen recordings.
+detachable, selection popover, all three tool policies, per-turn caps, highlight
+theming, page, and theme. Click the tab or press `h` to collapse it, which
+leaves the page looking like an ordinary site for screenshots and recordings.
 
 The panel writes its state to the query string, so any configuration is a
 reproducible link:
@@ -57,6 +57,7 @@ http://localhost:5173/pricing?variant=sidebar&appearance=glass&theme=dark&panel=
 | `theme` | `light`, `dark` |
 | `navigate`, `highlight`, `interact` | `auto`, `confirm`, `disabled` |
 | `askSide` | `top`, `bottom`, `left`, `right` |
+| `detach` | `1` to offer the dock/sidebar detach control |
 | `panel` | `0` to start with the control panel collapsed |
 
 Those are the common ones; every knob in the panel has a param, and
@@ -101,6 +102,22 @@ ignored `apps/playground/server/gemini.local.ts`, and keeps provider-specific
 artifacts out of committed manifests. `Ctrl-C` stops the site and API together.
 
 ## Install agent-ui in an app
+
+Four things have to be true before the assistant can answer anything. The
+sections below do them in order; this is the checklist to come back to when
+something is not working.
+
+| # | Step | You are done when |
+| --- | --- | --- |
+| 1 | Scaffold the source | `src/agent/` and `.agent.json` exist, dependencies installed |
+| 2 | Render `<AgentChat>` | The launcher appears and the panel opens |
+| 3 | Describe your pages | A public manifest and a server manifest with content |
+| 4 | Mount the server route + key | `POST /api/agent` streams a reply |
+
+Steps 3 and 4 are the two people skip. Without a server route the panel opens
+and every message fails; without page content the assistant answers "that is not
+in the site content" to everything. Both have a symptom row in
+[Troubleshooting](#troubleshooting).
 
 ### 1. Scaffold
 
@@ -197,6 +214,30 @@ Highlighting requires a registered target. Clicking additionally requires
 `interactive: true`, user confirmation by default, and a native enabled
 button-like element; Agent never clicks links or text inputs.
 
+**Writing content the model can actually use.** The manifest is the assistant's
+entire knowledge of your site — nothing is crawled from the live DOM — so the
+quality of the answers is the quality of what you write here.
+
+- **`description`** is what the model sees for *every* page on every request,
+  even pages whose body did not fit the budget. Make it say what the page
+  answers ("Membership rates, day passes, and gear rentals"), not what it is
+  ("The pricing page").
+- **`keywords`** are how a page gets picked when the user's words are not your
+  words: rates/cost/price, hours/open/close, cancel/refund. They score higher
+  than body text, so put the synonyms here rather than seeding them into prose.
+- **`body`** is markdown, and the parts users ask about should be *facts*, not
+  marketing: numbers, hours, limits, names. Keep every number identical to the
+  page the user is reading, or the assistant will contradict what is on screen.
+- **`targets`** are for pointing, so describe them as a person would name the
+  thing on screen ("Membership plan cards"). The id is what the model passes to
+  the tools; the description is how it decides which one to pass.
+- **One page, one document.** Write the routes once in the public manifest and
+  let `withContent` carry them over. A page with no content still gets an empty
+  document, so the model's catalog and the browser's allowlist can never drift.
+- Anything the model must *never* say goes in the server-owned `agent` profile
+  or `system` string (step 5) — not in the content, which is explicitly labeled
+  untrusted data.
+
 **How the assistant reads your pages.** Every request gets the route catalog
 (titles, descriptions, target ids) plus page bodies chosen server-side: the
 user's current route first, then the highest-scoring documents by a
@@ -275,13 +316,29 @@ the same Fetch handler through your framework route, a Vercel Function, a
 Cloudflare Worker/Pages Function, or a Node server via `toNodeHandler`. You do
 not need to manage a separate public port.
 
-Set the key only in the server environment:
+#### The API key
+
+Put it in the server environment only — a plain `.env` (or `.env.local`) at your
+project root, which the adapter reads by itself. You never pass the key to
+`createAgentHandler`.
 
 ```dotenv
 GOOGLE_GENERATIVE_AI_API_KEY=your_key_here
 ```
 
-Never use a browser-exposed `VITE_` or `NEXT_PUBLIC_` prefix for provider keys.
+Three rules, in order of how often they are broken:
+
+1. **Never prefix it `VITE_` or `NEXT_PUBLIC_`.** Those prefixes exist to ship a
+   value to the browser, which for a provider key means publishing it. agent-ui
+   never reads them.
+2. **Use the exact variable name the adapter expects** (see the
+   [provider reference](#provider-reference)). A renamed variable looks
+   identical to a missing one.
+3. **Keep the model choice server-side too.** The browser cannot override the
+   model, the system prompt, or the profile; that is the point of the split.
+
+Restart the dev server after editing `.env` — adapters read the environment at
+startup, so a running process keeps the old value.
 
 ### 5. Give the assistant an identity (optional)
 
@@ -318,6 +375,22 @@ removed by either field.
 
 Prefer rolling aliases when available because dated model IDs can retire.
 
+### Troubleshooting
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| Panel opens, every message errors | No server route mounted, or the wrong path | Mount `createAgentHandler` and match the `api` prop to it (default `/api/agent`) |
+| `AI_UnsupportedModelVersionError` | Adapter major ahead of `ai@^5` | Install the `^2` adapter, not `latest` |
+| Provider 401/403 in the server log | Key missing, misnamed, or read from a `VITE_`/`NEXT_PUBLIC_` variable | Use the exact variable name from the table above in a server-side `.env`, then restart |
+| `{"error":"origin-not-allowed"}` | API served from a different origin than the UI | Pass `allowedOrigins` to `createAgentHandler` |
+| `{"error":"body-too-large"}` / `message-too-long` | Request past a hardening cap | Raise the specific `limits` field (each has a hard ceiling) |
+| "That is not in the site content" for everything | Server manifest has no bodies | Fill in `withContent`; check the route keys match the public manifest exactly |
+| Answers are right but for the wrong page | Descriptions and keywords too thin to rank | See "Writing content the model can actually use" above |
+| `unknown-target` on a highlight | The id is not registered for that route, or the markup lacks `data-agent-target` | Add it to the route's `targets` and to the element |
+| `it is on /x, not this page` | The model tried to point at another page's element | Working as intended — it should navigate first; if it keeps skipping that, `navigate` is `disabled` or its per-turn cap is `0` |
+| Nothing happens on a click request | Target not `interactive: true`, or not a native button | Both are required; Agent never clicks links or text inputs |
+| Streaming reply says only "An error occurred." | The real error is masked by design | Read the server log, or pass `onError` during local debugging only |
+
 ## Configure the UI
 
 Required props are `api`, `currentRoute`, `navigate`, and `manifest`.
@@ -330,6 +403,7 @@ Required props are `api`, `currentRoute`, `navigate`, and `manifest`.
 | `icon` | Agent mark | Custom brand node |
 | `side` | `"right"` | Dock/sidebar edge |
 | `launcher` | `"tab"` | Sidebar `"tab"` or `"button"` |
+| `detachable` | `false` | Offer a detach control: the dock/sidebar becomes a floating, draggable window |
 | `shortcutKey` | `"/"` | Spotlight shortcut |
 | `selectionAsk` | `true` | Offer Agent for selected page text |
 | `selectionSide` | `"top"` | Which edge of the selection that popup sits on: `"top"`, `"bottom"`, `"left"`, `"right"` |
@@ -343,6 +417,95 @@ replaced by a second element rising from below. The tab and panel header use
 the same primary color, and the brand's horizontal and vertical motion meets
 the collapsed layout without a final alignment snap. Reduced-motion
 preferences skip the transition.
+
+### Detached panels
+
+`detachable` adds one button to the dock and sidebar header. Pressing it lifts
+the panel off its screen edge into a floating window that drags by its title
+bar; pressing it again puts it back. A detached sidebar stops pushing the page,
+so the layout returns to full width while the conversation stays open.
+
+```tsx
+<AgentChat detachable variant="sidebar" /* …required props… */ />
+```
+
+Closing re-attaches, so the collapsed launcher is always where the user left it
+on the edge. A floating panel opens centered in the viewport and stays there
+until the user drags it — a fixed corner would fling it diagonally away from the
+launcher it came from — and a drag or a window resize can never leave the title
+bar off screen. `AgentProvider` also accepts
+`detached`/`onDetachedChange` (controlled) and `defaultDetached`, matching how
+`open` works, and `DetachButton` can be placed anywhere in a custom header — it
+renders nothing when `detachable` is false. The spotlight is already a centered
+overlay and ignores all of this.
+
+Detaching also changes the panel's chrome, because a window is not an edge: it
+gains a drop shadow, rounds all four corners, drops the single border that only
+existed to face the page, and paints an opaque title bar. In a custom header,
+`useAgentDragHandle()` returns the pointer props that make an element the drag
+handle (`AgentPointerDragProps`), or `null` while the panel is attached —
+spreading it onto your own bar is all that is needed:
+
+```tsx
+const drag = useAgentDragHandle();
+return <header {...(drag ?? {})}>{/* … */}</header>;
+```
+
+### Starter prompts
+
+`starterPrompts` are the suggested tasks shown before the first message. They
+are presentation over `agent.sendText`: clicking one sends an ordinary user turn,
+so a starter grants nothing a typed message would not.
+
+```tsx
+import { AgentStarterPrompts, DEFAULT_STARTER_PROMPTS } from "./agent";
+
+// The whole list, per page:
+<AgentChat starterPrompts={DEFAULT_STARTER_PROMPTS} /* … */ />;
+
+// Or place the buttons yourself, anywhere inside the provider:
+<AgentStarterPrompts prompts={[{ label: "Compare plans", prompt: "What plans do you have?" }]} />;
+```
+
+`DEFAULT_STARTER_PROMPTS` is deliberately site-agnostic boilerplate ("What's on
+this page?"), there so the feature can be seen working before anyone writes
+copy. Replace it: one suggestion that names something real on the page is worth
+several that do not. The default is no prompts at all, so nothing appears until
+you opt in.
+
+### Customizing the interact tool
+
+`interact` is one interaction behind a generic pipeline, so it can be turned into
+a different interaction by editing `core/interact.ts` alone. Three pieces decide
+what it does:
+
+| Edit | Controls |
+| --- | --- |
+| `isInteractable` | Which elements may be touched at all |
+| `applyInteraction` | What actually happens to the element |
+| `INTERACTION_VERB` | The word the transcript and screen reader announce |
+
+Everything around them — resolving the `data-agent-target` id, the highlight
+flash, the aria-live announcement — is shared and does not care what the action
+is. Enforcement deliberately lives elsewhere: the manifest opt-in
+(`interactive: true`), the `auto | confirm | disabled` policy, and the per-turn
+cap are in `use-agent-chat.ts` and `tool-policy.ts`. So rewriting those three
+pieces changes *what happens* to an element the model was already allowed to act
+on; it cannot widen which elements the model may reach, and the approval card
+still appears. Widen `isInteractable` only to elements whose activation the user
+can see happen.
+
+### Ordering: navigate before pointing
+
+`highlight` and `interact` only reach the page the user is on. That constraint is
+enforced three ways rather than left to the model's judgement: the system prompt
+states the ordering rule, the tool descriptions repeat it, and a target that
+belongs to another route is rejected with `target-on-another-route` *and the
+route it lives on*, so the model navigates there and retries instead of
+concluding the element does not exist. Within a turn, a highlight or click that
+follows a navigation waits for the host router to commit the new route (and one
+painted frame) before it touches the DOM, so it can never measure the page it
+was leaving.
 
 The chosen `selectionSide` is honored rather than flipped. The popover is only
 nudged back inside the viewport when it would overflow. Its main **Ask Agent**
@@ -370,7 +533,12 @@ dark artwork:
 Tool defaults are highlight `auto`, navigate `confirm`, and interact `confirm`.
 The auto-approve control can skip confirmation but never re-enable a disabled
 tool. Colors, radius, surfaces, and glass tint use `--agent-*` CSS tokens with
-separate `.dark` values.
+separate `.dark` values. Retheming means setting those tokens and nothing else:
+the panel-header color and the band painted behind it both derive from
+`--agent-primary`, so they follow a brand change automatically. The one pairing
+to keep in step is `--agent-header-height` and the header's own height — the band
+is drawn exactly that tall, so that no panel surface shows at the header's edges.
+Resizing a panel commits whole pixels for the same reason.
 
 Completed page actions are grouped in the transcript. The **Replay actions**
 control re-executes the successful built-in client actions in that group
@@ -389,17 +557,19 @@ For custom composition, use `<AgentProvider>` with `AgentDock`, `AgentSidebar`, 
 parts. Every part reads the shared context, so pieces can be dropped, reordered,
 or replaced without wiring props, and without changing core tool enforcement.
 Cosmetic slots follow the same pattern: `AgentMessages` accepts an `emptyState`
-node for the before-first-message copy, and `AutoApproveButton` renders its
-children in place of the default glyph. The prop types (`AgentDockProps`,
-`AgentSidebarProps`, `AgentSpotlightProps`, `AgentStarterPrompt`, `AgentSide`) are
-exported for typed wrappers.
+node for the before-first-message copy, `AgentStarterPrompts` takes its own
+`prompts` list, and `AutoApproveButton` renders its children in place of the
+default glyph. Context hooks cover the rest: `useAgentContext`,
+`useCloseAgent`, and `useAgentDragHandle`. The prop types (`AgentDockProps`,
+`AgentSidebarProps`, `AgentSpotlightProps`, `AgentStarterPrompt`, `AgentSide`,
+`AgentPointerDragProps`) are exported for typed wrappers.
 
 ## Develop this repository
 
 ```bash
 bun run typecheck    # registry, CLI, and playground TypeScript
-bun test             # 172 unit and component-contract tests
-bun run test:e2e     # 15 Chromium flows; starts Vite automatically
+bun test             # 195 unit and component-contract tests
+bun run test:e2e     # 21 Chromium flows; starts Vite automatically
 bun run cli:build    # rebuild CLI output and bundled templates
 ```
 
@@ -419,9 +589,10 @@ Repository layout:
 ## Status
 
 Implemented: registry, dock/sidebar/spotlight variants, composable parts,
-continuous dock expansion, split selection-to-chat/context controls, grouped
-local action replay, hardened server handler, Node bridge, `agent-ui init`, mock
-and real-provider playground paths, unit/component tests, and Playwright tests.
+continuous dock expansion, detachable dock/sidebar windows, split
+selection-to-chat/context controls, grouped local action replay, hardened server
+handler, Node bridge, `agent-ui init`, mock and real-provider playground paths,
+unit/component tests, and Playwright tests.
 
 Planned: `agent-ui add`, `sync`, `doctor`, and `update`; generated markdown
 manifests; framework adapters/examples; provider factories; durable rate

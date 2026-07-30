@@ -17,6 +17,9 @@
   --agent-danger: oklch(0.5 0.2 25);
   --agent-danger-border: oklch(0.6 0.2 25);
   --agent-radius: 0.75rem;
+  /* The standard panel header's minimum height. --agent-panel-band is painted
+     exactly this tall, so the two must move together. */
+  --agent-header-height: 2.75rem;
   --agent-selection-radius: 0.625rem;
   --agent-highlight-border-color: var(--agent-accent);
   --agent-highlight-border-width: 2px;
@@ -314,6 +317,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  box-sizing: border-box;
+  /* A floor, not a fixed height: content may make the bar taller, and
+     --agent-panel-band relies on never being taller than the bar it backs. */
+  min-height: var(--agent-header-height);
   padding: 0.625rem 0.875rem;
   /* Translucent so the panel's glass blur still reads through the header. */
   background: color-mix(in oklch, var(--agent-primary) 80%, transparent);
@@ -685,9 +692,15 @@
  *
  * Callers set their own border-radius; declared before the variant sections so
  * each variant's own radius wins.
+ *
+ * Both surfaces carry --agent-panel-band as their topmost background layer.
+ * It is empty unless a shell opts in (see --agent-panel-band below), and it is
+ * a layer on *these* elements rather than a child so that it shares their edge
+ * antialiasing.
  */
 .agent-glass {
   background:
+    var(--agent-panel-band, none),
     linear-gradient(160deg, var(--agent-glass-sheen), transparent 55%),
     var(--agent-glass);
   backdrop-filter: blur(24px) saturate(1.8);
@@ -696,12 +709,14 @@
 }
 
 @supports not (backdrop-filter: blur(1px)) {
-  .agent-glass { background: var(--agent-surface); }
+  .agent-glass {
+    background: var(--agent-panel-band, none), var(--agent-surface);
+  }
 }
 
 @media (prefers-reduced-transparency: reduce) {
   .agent-glass {
-    background: var(--agent-surface);
+    background: var(--agent-panel-band, none), var(--agent-surface);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
@@ -718,7 +733,7 @@
  * default radius so variant overrides below apply to either surface.
  */
 .agent-solid {
-  background: var(--agent-surface);
+  background: var(--agent-panel-band, none), var(--agent-surface);
   border: 1px solid var(--agent-border);
   border-radius: calc(var(--agent-radius) + 0.25rem);
 }
@@ -733,6 +748,41 @@
 }
 .agent-sidebar-panel.agent-solid.agent-side-left {
   border-right: 1px solid var(--agent-border);
+}
+
+/*
+ * Behind a panel's header, the panel's own surface must not be what shows.
+ *
+ * The header is an opaque box drawn inside a rounded, clipped panel whose
+ * surface is near-white in light mode, and it does not get to assume its edges
+ * line up with the panel's to the device pixel. They do not, in two ways:
+ *
+ *   - The corners. Header and panel round the same curve and each antialiases
+ *     it separately, so along the curve the header's paint fades out and the
+ *     surface comes through as a pale arc — one light pixel per top corner.
+ *   - The sides. The panel paints its background while an inner wrapper does
+ *     the rounded overflow clipping, and at fractional or scaled device pixels
+ *     those two edges can land a pixel apart, leaving a hairline of surface
+ *     down the full height of the header.
+ *
+ * Both vanish if the colour behind the header is the header's own. This band is
+ * that colour, painted as tall as the header and as the panel's *topmost
+ * background layer*: the layers of one element are composited before that
+ * element's edge is antialiased, so a single colour sits behind the header's
+ * whole box. A child element cannot do the job — its edge antialiases
+ * separately, which is the problem itself.
+ *
+ * `:has()` scopes this to the standard header, whose colour and minimum height
+ * are ours (--agent-header-height); a consumer's own bar keeps its own colour
+ * and gets no band under it. Only shells whose header is opaque opt in — behind
+ * a translucent one the band would read as a darker strip.
+ */
+.agent-dock-panel:has(.agent-panel-header),
+.agent-sidebar-panel.agent-detached:has(.agent-panel-header) {
+  --agent-panel-band: linear-gradient(
+    var(--agent-primary) var(--agent-header-height),
+    transparent 0
+  );
 }
 
 /* ---------- dock variant ---------- */
@@ -916,7 +966,9 @@ body.agent-resizing-nesw *,
 body.agent-resizing-ew,
 body.agent-resizing-ew *,
 body.agent-resizing-ns,
-body.agent-resizing-ns * {
+body.agent-resizing-ns *,
+body.agent-resizing-move,
+body.agent-resizing-move * {
   user-select: none;
 }
 body.agent-resizing-nwse,
@@ -934,6 +986,11 @@ body.agent-resizing-ew * {
 body.agent-resizing-ns,
 body.agent-resizing-ns * {
   cursor: ns-resize !important;
+}
+/* Same mechanism for the detached panel's title-bar drag. */
+body.agent-resizing-move,
+body.agent-resizing-move * {
+  cursor: move !important;
 }
 @media (max-width: 640px) {
   .agent-dock-frame[data-state="opening"],
@@ -1059,6 +1116,90 @@ body.agent-sidebar-push-left { margin-left: var(--agent-sidebar-width); }
 
 @media (max-width: 640px) {
   .agent-sidebar-panel { width: 100%; }
+}
+
+/* ---------- detached panels (dock + sidebar) ---------- */
+
+/*
+ * Detaching turns an edge-pinned panel into a floating window. Both stacking
+ * shells share this block, so a detached dock and a detached sidebar are the
+ * same object with different remembered dimensions.
+ *
+ * Placement is CSS until the first drag, matching how --agent-sidebar-width
+ * works: the stylesheet owns the resting spot and only a pointer writes inline
+ * left/top. That spot is the middle of the viewport — a panel lifted off an edge
+ * has to land somewhere deliberate, and any fixed corner means a diagonal jump
+ * across the screen from wherever the launcher was.
+ *
+ * Centering is `inset: 0` plus auto margins rather than a translate, because the
+ * handover to a drag then needs no undoing: once the drag writes left/top with
+ * right/bottom auto, the box is no longer over-constrained and the auto margins
+ * resolve to zero on their own. A transform would keep offsetting the panel by
+ * half its size and have to be cancelled inline.
+ */
+.agent-detached {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  border-radius: var(--agent-radius);
+  /* Nothing behind it now sells "lifted", so the shadow has to. Panels on an
+     edge stay borderless (see .agent-glass); this adds depth, not a rim. */
+  box-shadow: 0 12px 40px oklch(0 0 0 / 0.28);
+}
+
+/* The dock frame carries the position; its panel follows the frame's corners
+   instead of the squared-off bottom edge it had against the screen. The header
+   keeps the top-only radius it already has. */
+.agent-dock-frame.agent-detached .agent-dock-panel {
+  border-radius: var(--agent-radius);
+}
+
+/* The sidebar is full-height when attached; detached it takes a window's height
+   and keeps whatever width the user had dragged it to. The dvh cap leaves room
+   above and below on short viewports, so the centered panel still reads as a
+   window rather than a full-height slab. */
+.agent-sidebar-panel.agent-detached {
+  height: min(32rem, 85dvh);
+  animation: none;
+}
+/* Attached, the one border faces the page (see the edge rules above). Floating,
+   it would be a hairline down a single edge of a window that has a shadow for
+   its depth, so it goes. */
+.agent-sidebar-panel.agent-solid.agent-detached {
+  border: none;
+}
+/* Opaque, like the dock's, so the header is one colour where it paints the
+   panel's top corners — see --agent-panel-band. */
+.agent-sidebar-panel.agent-detached .agent-panel-header {
+  border-radius: var(--agent-radius) var(--agent-radius) 0 0;
+  background: var(--agent-primary);
+}
+/* The edge grab bar faced the page; floating, it belongs on the panel itself. */
+.agent-sidebar-panel.agent-detached.agent-side-right .agent-sidebar-resize {
+  left: auto;
+  right: -0.2rem;
+}
+
+/* The title bar becomes the window's drag handle. Only the bar itself: the
+   handlers in AgentHeader ignore presses that land on a control, so the
+   buttons inside keep their pointer cursor and their clicks. */
+.agent-panel-header[data-agent-drag] {
+  cursor: move;
+  touch-action: none;
+}
+
+/* Small screens: a detached sidebar covers the viewport, so it drops the window
+   chrome — there is no page behind it to float over and nothing to drag it to.
+   The dock keeps its remembered size and stays a centered window. */
+@media (max-width: 640px) {
+  .agent-sidebar-panel.agent-detached {
+    height: 100dvh;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .agent-sidebar-panel.agent-detached .agent-panel-header {
+    border-radius: 0;
+  }
 }
 
 /* ---------- spotlight variant ---------- */

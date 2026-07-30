@@ -1,3 +1,4 @@
+import { findTargetElement } from "./target";
 import type { AgentHighlightOptions, AgentToolOutput } from "./types";
 
 interface ActiveHighlight {
@@ -31,18 +32,16 @@ export function dismissHighlight(): void {
 
 /**
  * Highlight an opted-in page element. The target id must already be validated
- * against the manifest; this only locates `data-agent-target` elements and
- * never accepts arbitrary selectors. The overlay is absolutely positioned so
+ * against the manifest; resolution goes through `findTargetElement`, so an
+ * arbitrary selector is never accepted. The overlay is absolutely positioned so
  * it causes no layout shift, and it cleans itself up after `durationMs`.
  */
 export function runHighlight(
   targetId: string,
   options?: AgentHighlightOptions & { label?: string },
 ): AgentToolOutput {
-  const element = document.querySelector(
-    `[data-agent-target="${CSS.escape(targetId)}"]`,
-  );
-  if (!(element instanceof Element)) {
+  const element = findTargetElement(targetId);
+  if (element === null) {
     return { ok: false, reason: "target-not-found" };
   }
 

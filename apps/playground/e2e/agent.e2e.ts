@@ -261,6 +261,46 @@ test("navigate pushes a real history entry the back button can undo", async ({
   await expect(page).toHaveURL(/localhost:5183\/$/);
 });
 
+test("a highlight on another page navigates there first, then lands", async ({
+  page,
+}) => {
+  // The reported failure mode: asked to go somewhere and point at something,
+  // the assistant tried to point first and the target did not exist yet.
+  await page.goto("/?panel=0");
+  await openLauncher(page);
+  await sendMessage(page, "Take me to pricing and highlight the gear rentals");
+
+  await page.getByRole("button", { name: "Allow" }).click();
+  await expect(page).toHaveURL(/\/pricing/);
+
+  // The highlight is a second, dependent step, and it resolves against the page
+  // that was navigated to — the overlay exists and the target is the real one.
+  await expect(dialog(page).getByText("Highlighted “gear-rentals”")).toBeVisible();
+  await expect(page.locator(".agent-highlight-overlay")).toBeVisible();
+  // Overlay geometry, on the horizontal axis only: the vertical one is still
+  // settling from the scroll-into-view when this runs.
+  const overlay = await page.locator(".agent-highlight-overlay").boundingBox();
+  const target = await page
+    .locator('[data-agent-target="gear-rentals"]')
+    .boundingBox();
+  if (!overlay || !target) throw new Error("highlight was not measurable");
+  expect(Math.abs(overlay.x - (target.x - 6))).toBeLessThan(2);
+  expect(Math.abs(overlay.width - (target.width + 12))).toBeLessThan(2);
+});
+
+test("pointing at another page's target reports the route it lives on", async ({
+  page,
+}) => {
+  // No navigation in the ask, so the model's target is simply wrong for this
+  // page. The failure has to name the route, or the model cannot recover.
+  await page.goto("/?panel=0&highlight=auto");
+  await openLauncher(page);
+  await sendMessage(page, "Highlight the gear rentals");
+  await expect(
+    dialog(page).getByText("it is on /pricing, not this page"),
+  ).toBeVisible();
+});
+
 test("the ask popover attaches to each of the four selection sides", async ({
   page,
 }) => {
@@ -403,4 +443,145 @@ test("the control panel collapses to its edge tab and back", async ({
   await page.getByRole("textbox", { name: "Message Agent" }).pressSequentially("hi");
   await expect(page.getByRole("textbox", { name: "Message Agent" })).toHaveValue("hi");
   await expect(pane).toHaveCount(0);
+});
+
+test("a detached sidebar floats free, drags by its header, and gives the page back", async ({
+  page,
+}) => {
+  await page.goto("/?panel=0&variant=sidebar&detach=1");
+  await openLauncher(page);
+  const panel = page.locator('[data-agent-ui="sidebar-panel"]');
+  await expect(panel).toBeVisible();
+
+  // The push margin is what "attached" means for this shell, and it eases over
+  // 0.45s — poll rather than sampling mid-transition.
+  const pushMargin = () =>
+    page.evaluate(() =>
+      Number.parseFloat(getComputedStyle(document.body).marginRight),
+    );
+  await expect.poll(pushMargin).toBeGreaterThan(0);
+
+  await page.getByRole("button", { name: "Detach chat panel" }).click();
+  await expect(panel).toHaveClass(/agent-detached/);
+  await expect.poll(pushMargin).toBe(0);
+
+  // It lands centered rather than in a corner: lifting a panel off an edge and
+  // flinging it diagonally across the screen loses the user's place.
+  const viewport = page.viewportSize();
+  const before = await panel.boundingBox();
+  if (!viewport || !before) throw new Error("detached panel was not measurable");
+  expect(before.x + before.width / 2).toBe(viewport.width / 2);
+  expect(before.y + before.height / 2).toBe(viewport.height / 2);
+
+  // Drag the title bar. Pointer capture and the position math only exist in a
+  // real browser, which is why this flow lives here and not in the DOM suite.
+  // The delta is asserted exactly: the centered resting spot is auto margins,
+  // and a placement that sets only some of the offsets leaves those margins
+  // still centering the box, so it slides further than the pointer went.
+  const header = panel.locator(".agent-panel-header");
+  const grab = await header.boundingBox();
+  if (!grab) throw new Error("panel header was not measurable");
+  await page.mouse.move(grab.x + grab.width / 2, grab.y + grab.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grab.x + grab.width / 2 + 120, grab.y + grab.height / 2 + 60);
+  await page.mouse.up();
+  const after = await panel.boundingBox();
+  if (!after) throw new Error("dragged panel was not measurable");
+  expect(after.x - before.x).toBe(120);
+  expect(after.y - before.y).toBe(60);
+
+  // The header's own buttons still work after being used as a drag handle.
+  await page.getByRole("button", { name: "Attach chat panel" }).click();
+  await expect(panel).not.toHaveClass(/agent-detached/);
+  await expect.poll(pushMargin).toBeGreaterThan(0);
+});
+
+/*
+ * The pale-corner regressions. Both artifacts were sub-pixel, so they are
+ * asserted as the style contract that removes them rather than by screenshot:
+ * a baseline of a 1px arc is exactly the kind that differs per platform.
+ */
+test("a panel whose header paints its top corners backs them with the header's own colour", async ({
+  page,
+}) => {
+  for (const appearance of ["default", "glass"] as const) {
+    await page.goto(`/?panel=0&detach=1&appearance=${appearance}`);
+    await openLauncher(page);
+    const panel = page.locator('[data-agent-ui="dock-panel"]');
+    const header = panel.locator(".agent-panel-header");
+
+    // The band is the panel's topmost background layer, so its colour has to
+    // track the header's: anything lighter shows through the header's corner.
+    const band = await panel.evaluate(
+      (element) =>
+        getComputedStyle(element).backgroundImage.match(
+          /^linear-gradient\((rgba?\([^)]*\))\s+([\d.]+)px/,
+        ),
+    );
+    const headerColour = await header.evaluate(
+      (element) => getComputedStyle(element).backgroundColor,
+    );
+    expect(band?.[1]).toBe(headerColour);
+    // Opaque, or the surface still reads through it.
+    expect(headerColour).not.toMatch(/rgba\(.*,\s*0?\.\d+\)/);
+
+    // The band has to reach the header's full height: a shorter one leaves the
+    // surface behind the sides of the bar, where a rounded overflow clip that
+    // rounds a pixel differently from the panel's background exposes it as a
+    // hairline. Taller would paint a strip below the bar instead.
+    const headerHeight = (await header.boundingBox())?.height;
+    expect(Number(band?.[2])).toBe(headerHeight);
+  }
+});
+
+test("resizing commits whole pixels, so no panel edge lands mid-pixel", async ({
+  page,
+}) => {
+  await page.goto("/?panel=0");
+  await openLauncher(page);
+  // The frame's width interpolates while it grows, so measure the resting size:
+  // data-state leaves "opening" on the height transition's end.
+  await expect(page.locator('[data-agent-ui="dock-frame"]')).toHaveAttribute(
+    "data-state",
+    "open",
+  );
+  const panel = page.locator('[data-agent-ui="dock-panel"]');
+  const handle = page.getByRole("button", { name: "Resize chat panel" });
+  const grab = await handle.boundingBox();
+  if (!grab) throw new Error("resize handle was not measurable");
+
+  // Fractional deltas, the way a pointer or a trackpad delivers them.
+  await page.mouse.move(grab.x + grab.width / 2, grab.y + grab.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grab.x - 31.4, grab.y - 15.9, { steps: 5 });
+  await page.mouse.up();
+
+  const box = await panel.boundingBox();
+  if (!box) throw new Error("resized panel was not measurable");
+  expect(box.width).toBe(Math.round(box.width));
+  expect(box.height).toBe(Math.round(box.height));
+});
+
+test("a detached sidebar drops the border that only faced the page", async ({
+  page,
+}) => {
+  await page.goto("/?panel=0&variant=sidebar&detach=1");
+  await openLauncher(page);
+  const panel = page.locator('[data-agent-ui="sidebar-panel"]');
+  const borders = () =>
+    panel.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return [
+        style.borderTopWidth,
+        style.borderRightWidth,
+        style.borderBottomWidth,
+        style.borderLeftWidth,
+      ];
+    });
+  // Attached, the edge facing the page carries the only line.
+  expect((await borders()).filter((width) => width !== "0px")).toHaveLength(1);
+
+  await page.getByRole("button", { name: "Detach chat panel" }).click();
+  await expect(panel).toHaveClass(/agent-detached/);
+  expect(await borders()).toEqual(["0px", "0px", "0px", "0px"]);
 });

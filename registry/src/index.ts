@@ -2,6 +2,7 @@ export { AgentChat, type AgentChatProps } from "./components/agent-chat";
 export {
   AgentProvider,
   useAgentContext,
+  useAgentDragHandle,
   useCloseAgent,
   type AgentContextValue,
   type AgentProviderProps,
@@ -23,10 +24,22 @@ export {
   AgentHeader,
   AgentInput,
   AgentMessages,
+  AgentStarterPrompts,
   AgentTitle,
   CloseButton,
+  DetachButton,
   NewChatButton,
 } from "./components/chat-parts";
+export {
+  DEFAULT_STARTER_PROMPTS,
+  NO_STARTER_PROMPTS,
+} from "./core/starter-prompts";
+export {
+  clampPosition,
+  useDetachedPanel,
+  type DetachedPosition,
+} from "./core/use-detach";
+export type { AgentPointerDragProps } from "./core/use-resize-drag";
 export { AgentSelectionPopover } from "./components/selection-popover";
 export {
   appendSelection,
@@ -46,6 +59,7 @@ export {
 } from "./core/use-agent-chat";
 export { dismissHighlight, runHighlight } from "./core/highlight";
 export { runInteract } from "./core/interact";
+export { findTargetElement } from "./core/target";
 export { shouldTriggerShortcut, type ShortcutEventLike } from "./core/shortcut";
 export type { AgentSide } from "./core/resize";
 export {
