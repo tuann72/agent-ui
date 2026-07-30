@@ -219,8 +219,15 @@ Do not weaken these constraints.
   `clampPosition`), and one `.agent-detached` CSS block. It is opt-in
   (`detachable` defaults to false) so the standard header gains no button by
   default. Closing re-attaches, because the collapsed launcher lives on a screen
-  edge. Position stays null until the first drag so CSS owns the resting spot
-  (`--agent-detached-inset`), mirroring `--agent-sidebar-width`. A detached
+  edge. Position stays null until the first drag so CSS owns the resting spot,
+  mirroring `--agent-sidebar-width`. That spot is the middle of the viewport: any
+  fixed corner jumps the panel diagonally away from the launcher it came from.
+  Centering is `inset: 0` plus auto margins rather than a translate, so the
+  inline left/top a drag writes takes over without a transform to cancel — the
+  auto margins resolve to zero once right/bottom are auto. That placement style
+  comes from the hook (`positionStyle`), not from each shell: every offset the
+  centering sets has to be released together, and a shell that wrote only some of
+  them would slide further than the pointer did. A detached
   sidebar must stop pushing the page, drop the border that only faced the page,
   and paint an opaque header like the dock's — floating, that header owns the
   panel's rounded top corners (see `--agent-panel-band`). The drag reaches

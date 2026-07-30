@@ -1126,29 +1126,25 @@ body.agent-sidebar-push-left { margin-left: var(--agent-sidebar-width); }
  * same object with different remembered dimensions.
  *
  * Placement is CSS until the first drag, matching how --agent-sidebar-width
- * works: the stylesheet owns the resting spot, and only a pointer writes inline
- * left/top. Host overrides therefore go on --agent-detached-inset, not on the
- * shells.
+ * works: the stylesheet owns the resting spot and only a pointer writes inline
+ * left/top. That spot is the middle of the viewport — a panel lifted off an edge
+ * has to land somewhere deliberate, and any fixed corner means a diagonal jump
+ * across the screen from wherever the launcher was.
+ *
+ * Centering is `inset: 0` plus auto margins rather than a translate, because the
+ * handover to a drag then needs no undoing: once the drag writes left/top with
+ * right/bottom auto, the box is no longer over-constrained and the auto margins
+ * resolve to zero on their own. A transform would keep offsetting the panel by
+ * half its size and have to be cancelled inline.
  */
-:root {
-  --agent-detached-inset: 3rem;
-}
-
 .agent-detached {
   position: fixed;
-  right: auto;
-  bottom: auto;
-  left: var(--agent-detached-inset);
-  top: var(--agent-detached-inset);
+  inset: 0;
+  margin: auto;
   border-radius: var(--agent-radius);
   /* Nothing behind it now sells "lifted", so the shadow has to. Panels on an
      edge stay borderless (see .agent-glass); this adds depth, not a rim. */
   box-shadow: 0 12px 40px oklch(0 0 0 / 0.28);
-}
-/* Anchored from the left once floating, so the drag math has one origin. */
-.agent-detached.agent-side-right,
-.agent-detached.agent-dock-right {
-  right: auto;
 }
 
 /* The dock frame carries the position; its panel follows the frame's corners
@@ -1158,12 +1154,12 @@ body.agent-sidebar-push-left { margin-left: var(--agent-sidebar-width); }
   border-radius: var(--agent-radius);
 }
 
-/* The sidebar is full-height when attached; detached it takes a window's
-   height and keeps whatever width the user had dragged it to. */
+/* The sidebar is full-height when attached; detached it takes a window's height
+   and keeps whatever width the user had dragged it to. The dvh cap leaves room
+   above and below on short viewports, so the centered panel still reads as a
+   window rather than a full-height slab. */
 .agent-sidebar-panel.agent-detached {
-  top: var(--agent-detached-inset);
-  bottom: auto;
-  height: min(32rem, calc(100dvh - var(--agent-detached-inset) * 2));
+  height: min(32rem, 85dvh);
   animation: none;
 }
 /* Attached, the one border faces the page (see the edge rules above). Floating,
@@ -1192,15 +1188,18 @@ body.agent-sidebar-push-left { margin-left: var(--agent-sidebar-width); }
   touch-action: none;
 }
 
-/* Nothing to drag when the panel is already the full width of the screen. */
+/* Small screens: a detached sidebar covers the viewport, so it drops the window
+   chrome — there is no page behind it to float over and nothing to drag it to.
+   The dock keeps its remembered size and stays a centered window. */
 @media (max-width: 640px) {
-  .agent-detached {
-    left: 0;
-    top: 0;
+  .agent-sidebar-panel.agent-detached {
+    height: 100dvh;
     border-radius: 0;
     box-shadow: none;
   }
-  .agent-sidebar-panel.agent-detached { height: 100dvh; }
+  .agent-sidebar-panel.agent-detached .agent-panel-header {
+    border-radius: 0;
+  }
 }
 
 /* ---------- spotlight variant ---------- */

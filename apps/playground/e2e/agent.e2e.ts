@@ -465,20 +465,30 @@ test("a detached sidebar floats free, drags by its header, and gives the page ba
   await expect(panel).toHaveClass(/agent-detached/);
   await expect.poll(pushMargin).toBe(0);
 
+  // It lands centered rather than in a corner: lifting a panel off an edge and
+  // flinging it diagonally across the screen loses the user's place.
+  const viewport = page.viewportSize();
+  const before = await panel.boundingBox();
+  if (!viewport || !before) throw new Error("detached panel was not measurable");
+  expect(before.x + before.width / 2).toBe(viewport.width / 2);
+  expect(before.y + before.height / 2).toBe(viewport.height / 2);
+
   // Drag the title bar. Pointer capture and the position math only exist in a
   // real browser, which is why this flow lives here and not in the DOM suite.
+  // The delta is asserted exactly: the centered resting spot is auto margins,
+  // and a placement that sets only some of the offsets leaves those margins
+  // still centering the box, so it slides further than the pointer went.
   const header = panel.locator(".agent-panel-header");
-  const before = await panel.boundingBox();
   const grab = await header.boundingBox();
-  if (!before || !grab) throw new Error("detached panel was not measurable");
+  if (!grab) throw new Error("panel header was not measurable");
   await page.mouse.move(grab.x + grab.width / 2, grab.y + grab.height / 2);
   await page.mouse.down();
   await page.mouse.move(grab.x + grab.width / 2 + 120, grab.y + grab.height / 2 + 60);
   await page.mouse.up();
   const after = await panel.boundingBox();
   if (!after) throw new Error("dragged panel was not measurable");
-  expect(after.x).toBeGreaterThan(before.x + 80);
-  expect(after.y).toBeGreaterThan(before.y + 40);
+  expect(after.x - before.x).toBe(120);
+  expect(after.y - before.y).toBe(60);
 
   // The header's own buttons still work after being used as a drag handle.
   await page.getByRole("button", { name: "Attach chat panel" }).click();

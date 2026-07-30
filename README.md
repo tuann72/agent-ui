@@ -430,9 +430,10 @@ so the layout returns to full width while the conversation stays open.
 ```
 
 Closing re-attaches, so the collapsed launcher is always where the user left it
-on the edge. The resting position of a floating panel comes from
-`--agent-detached-inset` until the user drags it, and a drag or a window resize
-can never leave the title bar off screen. `AgentProvider` also accepts
+on the edge. A floating panel opens centered in the viewport and stays there
+until the user drags it — a fixed corner would fling it diagonally away from the
+launcher it came from — and a drag or a window resize can never leave the title
+bar off screen. `AgentProvider` also accepts
 `detached`/`onDetachedChange` (controlled) and `defaultDetached`, matching how
 `open` works, and `DetachButton` can be placed anywhere in a custom header — it
 renders nothing when `detachable` is false. The spotlight is already a centered

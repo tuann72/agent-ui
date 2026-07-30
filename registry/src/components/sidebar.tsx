@@ -58,7 +58,7 @@ export function AgentSidebar({
   // A detached panel no longer occupies the edge, so the page takes its space
   // back — the push margin is what "attached" means for this shell.
   useSidebarPush({ open: open && !detached, side, width });
-  const { position, dragHandleProps } = useDetachedPanel({
+  const { positionStyle, dragHandleProps } = useDetachedPanel({
     detached,
     elementRef: panelRef,
   });
@@ -111,11 +111,7 @@ export function AgentSidebar({
           aria-label={`${title} assistant`}
           data-agent-ui="sidebar-panel"
           className={`${surfaceClass(appearance)} agent-sidebar-panel ${sideClass}${inputSeparator ? "" : " agent-no-separator"}${detached ? " agent-detached" : ""}${closing ? " agent-closing" : ""}`}
-          style={
-            detached && position
-              ? { left: position.x, top: position.y, right: "auto" }
-              : undefined
-          }
+          style={positionStyle ?? undefined}
           onAnimationEnd={panelAnimationEnd}
         >
           <button

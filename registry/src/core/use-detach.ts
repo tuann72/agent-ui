@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type RefObject } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type RefObject,
+} from "react";
 import { useResizeDrag, type AgentPointerDragProps } from "./use-resize-drag";
 
 export interface DetachedPosition {
@@ -64,6 +70,15 @@ export function useDetachedPanel({
   elementRef: RefObject<HTMLElement | null>;
 }): {
   position: DetachedPosition | null;
+  /**
+   * Inline placement for the panel, or null while the stylesheet's centered
+   * resting spot still applies. Built here rather than in each shell because
+   * every offset it sets has to be released for the position to mean anything:
+   * the centered default is `inset: 0` with auto margins, and a lone `left`/`top`
+   * only shifts the box the margins are still centering. Both shells were
+   * writing this object, and the sidebar's copy was missing `bottom`.
+   */
+  positionStyle: CSSProperties | null;
   dragHandleProps: AgentPointerDragProps;
 } {
   const [position, setPosition] = useState<DetachedPosition | null>(null);
@@ -104,5 +119,18 @@ export function useDetachedPanel({
     );
   });
 
-  return { position, dragHandleProps };
+  return {
+    position,
+    positionStyle:
+      detached && position
+        ? {
+            left: position.x,
+            top: position.y,
+            right: "auto",
+            bottom: "auto",
+            margin: 0,
+          }
+        : null,
+    dragHandleProps,
+  };
 }
