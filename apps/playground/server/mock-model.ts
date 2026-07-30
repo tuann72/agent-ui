@@ -255,6 +255,15 @@ function pickTarget(text: string): string {
   return "home-hero";
 }
 
+const wantsHighlight = (text: string): boolean =>
+  text.includes("highlight") || text.includes("show me the");
+
+const wantsNavigation = (text: string): boolean =>
+  text.includes("go to") ||
+  text.includes("navigate") ||
+  text.includes("take me") ||
+  text.includes("open the");
+
 function respond(prompt: LanguageModelV2Prompt): {
   parts: LanguageModelV2StreamPart[];
   finishReason: "stop" | "tool-calls";
@@ -275,6 +284,21 @@ function respond(prompt: LanguageModelV2Prompt): {
           ? "click that"
           : "highlight";
     if (value?.ok) {
+      // A request like "take me to pricing and highlight the rentals" is two
+      // ordered actions, and highlight only reaches the page the user is on.
+      // So the navigation gets its own step, and the target is resolved here,
+      // after it landed — which is what the real prompt now asks a model to do.
+      const original = lastUserText(prompt).toLowerCase();
+      if (result?.toolName === "navigate" && wantsHighlight(original)) {
+        return {
+          parts: toolCallParts(
+            "highlight",
+            { target: pickTarget(original) },
+            "call-highlight-after-navigate",
+          ),
+          finishReason: "tool-calls",
+        };
+      }
       const target =
         result?.toolName === "interact"
           ? lastToolCallTarget(prompt, "interact")
@@ -368,21 +392,18 @@ function respond(prompt: LanguageModelV2Prompt): {
     };
   }
 
-  if (text.includes("highlight") || text.includes("show me the")) {
+  // Navigation first when the ask needs both: the highlight is emitted in the
+  // next step, once the route has actually changed.
+  if (wantsNavigation(text)) {
     return {
-      parts: toolCallParts("highlight", { target: pickTarget(text) }),
+      parts: toolCallParts("navigate", { route: pickRoute(text) }),
       finishReason: "tool-calls",
     };
   }
 
-  if (
-    text.includes("go to") ||
-    text.includes("navigate") ||
-    text.includes("take me") ||
-    text.includes("open the")
-  ) {
+  if (wantsHighlight(text)) {
     return {
-      parts: toolCallParts("navigate", { route: pickRoute(text) }),
+      parts: toolCallParts("highlight", { target: pickTarget(text) }),
       finishReason: "tool-calls",
     };
   }

@@ -71,6 +71,12 @@ export interface InteractInput {
 export interface AgentToolOutput {
   ok: boolean;
   reason?: string;
+  /**
+   * The route a rejected target actually lives on. Set with
+   * `target-on-another-route` so the model can navigate there and retry instead
+   * of treating the page action as impossible.
+   */
+  expectedRoute?: string;
   /** True when the user clicked Allow on the approval card (vs. auto policy). */
   approvedByUser?: boolean;
 }

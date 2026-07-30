@@ -34,6 +34,8 @@ export interface PlaygroundConfig {
   header: boolean;
   inputSeparator: boolean;
   starterPrompts: boolean;
+  /** Offer the header's detach control (dock and sidebar only). */
+  detachable: boolean;
 
   // Selection
   selectionAsk: boolean;
@@ -70,6 +72,7 @@ export const DEFAULT_CONFIG: PlaygroundConfig = {
   header: true,
   inputSeparator: true,
   starterPrompts: true,
+  detachable: false,
 
   selectionAsk: true,
   selectionSide: "top",
@@ -175,6 +178,7 @@ const CODECS: { [K in keyof PlaygroundConfig]: Codec<PlaygroundConfig[K]> } = {
   header: flag("header"),
   inputSeparator: flag("separator"),
   starterPrompts: flag("starters"),
+  detachable: flag("detach"),
 
   selectionAsk: flag("ask"),
   selectionSide: oneOf("askSide", SELECTION_SIDES),

@@ -112,10 +112,28 @@ export interface UseAgentChatReturn {
   ) => Promise<readonly AgentReplayResult[]>;
 }
 
-interface ExecutionCounters {
+/**
+ * Mutable state for one run of client actions — an assistant turn, or one
+ * replay. Caps and the in-flight navigation live together here because they
+ * share a lifetime: a replay must not spend the turn's remaining navigations,
+ * and must not inherit a route transition the turn was still waiting on.
+ */
+interface ActionSequence {
   navigations: number;
   interactions: number;
+  /**
+   * A navigation this sequence issued that the host router has not committed
+   * yet. Page actions read the live DOM, so a dependent action waits for this
+   * instead of measuring the page it is leaving.
+   */
+  pendingRoute: string | null;
 }
+
+const newSequence = (): ActionSequence => ({
+  navigations: 0,
+  interactions: 0,
+  pendingRoute: null,
+});
 
 const ROUTE_SETTLE_TIMEOUT_MS = 1_500;
 const MAX_REPLAY_ACTIONS = 8;
@@ -165,10 +183,7 @@ export function useAgentChat(options: UseAgentChatOptions): UseAgentChatReturn {
   highlightOptionsRef.current = options.highlightOptions;
   const policiesRef = useRef(policies);
   policiesRef.current = policies;
-  const turnCountersRef = useRef<ExecutionCounters>({
-    navigations: 0,
-    interactions: 0,
-  });
+  const turnRef = useRef<ActionSequence>(newSequence());
   const replayRunningRef = useRef(false);
   const replayGenerationRef = useRef(0);
   const helpersRef = useRef<UseChatHelpers<AgentUIMessage> | null>(null);
@@ -178,146 +193,6 @@ export function useAgentChat(options: UseAgentChatOptions): UseAgentChatReturn {
     },
     [],
   );
-
-  const executeToolWithCounters = useCallback(
-    (
-      toolName: AgentToolName,
-      input: unknown,
-      counters: ExecutionCounters,
-    ): AgentToolOutput => {
-      if (toolName === "navigate") {
-        const route = stringField(input, "route");
-        if (route === undefined) return { ok: false, reason: "invalid-route" };
-        const check = validateRoute(manifest, route);
-        if (!check.ok) return check;
-        if (counters.navigations >= maxNavigations) {
-          return { ok: false, reason: "navigation-limit-reached" };
-        }
-        counters.navigations += 1;
-        navigateRef.current(route);
-        return { ok: true };
-      }
-      const target = stringField(input, "target");
-      if (target === undefined) return { ok: false, reason: "invalid-target" };
-      if (toolName === "interact") {
-        const check = validateInteraction(manifest, routeRef.current, target);
-        if (!check.ok) return check;
-        if (counters.interactions >= maxInteractions) {
-          return { ok: false, reason: "interaction-limit-reached" };
-        }
-        counters.interactions += 1;
-        return runInteract(target, highlightOptionsRef.current);
-      }
-      const check = validateTarget(manifest, routeRef.current, target);
-      if (!check.ok) return check;
-      return runHighlight(target, highlightOptionsRef.current);
-    },
-    [manifest, maxNavigations, maxInteractions],
-  );
-  const executeTool = useCallback(
-    (toolName: AgentToolName, input: unknown) =>
-      executeToolWithCounters(toolName, input, turnCountersRef.current),
-    [executeToolWithCounters],
-  );
-
-  const transport = useMemo(
-    () =>
-      new DefaultChatTransport<AgentUIMessage>({
-        api,
-        prepareSendMessagesRequest: ({ id, messages }) => ({
-          body: { id, messages, currentRoute: routeRef.current },
-        }),
-      }),
-    [api],
-  );
-
-  const chat = useChat<AgentUIMessage>({
-    transport,
-    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
-    onToolCall: ({ toolCall }) => {
-      const { toolName } = toolCall;
-      const helpers = helpersRef.current;
-      if (!helpers) return;
-      if (!isAgentToolName(toolName)) {
-        void helpers.addToolOutput({
-          state: "output-error",
-          tool: toolName,
-          toolCallId: toolCall.toolCallId,
-          errorText: "unknown-tool",
-        });
-        return;
-      }
-      const policy = policiesRef.current[toolName];
-      // `confirm` waits for the approval UI; everything else resolves now.
-      if (policy === "confirm") return;
-      const output: AgentToolOutput =
-        policy === "disabled"
-          ? { ok: false, reason: "disabled-by-policy" }
-          : executeTool(toolName, toolCall.input);
-      void helpers.addToolOutput({
-        tool: toolName,
-        toolCallId: toolCall.toolCallId,
-        output,
-      });
-    },
-  });
-  helpersRef.current = chat;
-
-  const [pendingQuotes, setPendingQuotes] = useState<readonly string[]>([]);
-  // Read through a ref so sendText keeps one identity across quote changes.
-  const quotesRef = useRef(pendingQuotes);
-  quotesRef.current = pendingQuotes;
-
-  const sendText = useCallback(
-    (text: string) => {
-      const trimmed = text.trim();
-      if (trimmed.length === 0) return;
-      turnCountersRef.current = { navigations: 0, interactions: 0 };
-      const quotes = quotesRef.current;
-      const message =
-        quotes.length > 0 ? buildQuotedMessage(quotes, trimmed) : trimmed;
-      setPendingQuotes([]);
-      void chat.sendMessage({ text: message });
-    },
-    [chat.sendMessage],
-  );
-
-  const attachQuote = useCallback((rawSelection: string) => {
-    setPendingQuotes((current) =>
-      appendSelection(current, rawSelection, maxPendingSelections),
-    );
-  }, [maxPendingSelections]);
-
-  const reset = useCallback(() => {
-    replayGenerationRef.current += 1;
-    void chat.stop();
-    chat.setMessages([]);
-    chat.clearError();
-    setPendingQuotes([]);
-    turnCountersRef.current = { navigations: 0, interactions: 0 };
-  }, [chat.stop, chat.setMessages, chat.clearError]);
-
-  const respondToToolCall = useCallback<UseAgentChatReturn["respondToToolCall"]>(
-    ({ toolName, toolCallId, input, approved }) => {
-      const output: AgentToolOutput = approved
-        ? { ...executeTool(toolName, input), approvedByUser: true }
-        : { ok: false, reason: "denied-by-user" };
-      void chat.addToolOutput({ tool: toolName, toolCallId, output });
-    },
-    [chat.addToolOutput, executeTool],
-  );
-
-  const stop = useCallback(() => void chat.stop(), [chat.stop]);
-
-  const removeQuote = useCallback(
-    (index: number) =>
-      setPendingQuotes((current) =>
-        current.filter((_, currentIndex) => currentIndex !== index),
-      ),
-    [],
-  );
-
-  const clearQuotes = useCallback(() => setPendingQuotes([]), []);
 
   const waitForRoute = useCallback(
     (route: string, generation: number): Promise<boolean> =>
@@ -363,6 +238,182 @@ export function useAgentChat(options: UseAgentChatOptions): UseAgentChatReturn {
     [],
   );
 
+  /**
+   * Let a navigation issued earlier in this sequence land before a dependent
+   * action runs. Clears the pending route either way: one `route-transition-
+   * failed` is a useful answer, but repeating it for every later action would
+   * hide whatever the real problem is.
+   */
+  const settlePendingRoute = useCallback(
+    async (sequence: ActionSequence, generation: number): Promise<boolean> => {
+      const pending = sequence.pendingRoute;
+      if (pending === null) return true;
+      const settled =
+        pending === routeRef.current ||
+        (await waitForRoute(pending, generation));
+      sequence.pendingRoute = null;
+      return settled;
+    },
+    [waitForRoute],
+  );
+
+  const executeInSequence = useCallback(
+    async (
+      toolName: AgentToolName,
+      input: unknown,
+      sequence: ActionSequence,
+      generation: number,
+    ): Promise<AgentToolOutput> => {
+      if (toolName === "navigate") {
+        const route = stringField(input, "route");
+        if (route === undefined) return { ok: false, reason: "invalid-route" };
+        const check = validateRoute(manifest, route);
+        if (!check.ok) return check;
+        if (sequence.navigations >= maxNavigations) {
+          return { ok: false, reason: "navigation-limit-reached" };
+        }
+        sequence.navigations += 1;
+        sequence.pendingRoute = route;
+        navigateRef.current(route);
+        return { ok: true };
+      }
+      const target = stringField(input, "target");
+      if (target === undefined) return { ok: false, reason: "invalid-target" };
+      // Highlighting and clicking resolve against the live DOM, so these are
+      // the actions that depend on a preceding navigation having finished.
+      // Clears the pending route either way: one `route-transition-failed` is a
+      // useful answer, repeating it for every later action only hides the
+      // manifest or target problem underneath.
+      if (!(await settlePendingRoute(sequence, generation))) {
+        return { ok: false, reason: "route-transition-failed" };
+      }
+      if (toolName === "interact") {
+        const check = validateInteraction(manifest, routeRef.current, target);
+        if (!check.ok) return check;
+        if (sequence.interactions >= maxInteractions) {
+          return { ok: false, reason: "interaction-limit-reached" };
+        }
+        sequence.interactions += 1;
+        return runInteract(target, highlightOptionsRef.current);
+      }
+      const check = validateTarget(manifest, routeRef.current, target);
+      if (!check.ok) return check;
+      return runHighlight(target, highlightOptionsRef.current);
+    },
+    [manifest, maxNavigations, maxInteractions, settlePendingRoute],
+  );
+  const executeTool = useCallback(
+    (toolName: AgentToolName, input: unknown) =>
+      executeInSequence(
+        toolName,
+        input,
+        turnRef.current,
+        replayGenerationRef.current,
+      ),
+    [executeInSequence],
+  );
+
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport<AgentUIMessage>({
+        api,
+        prepareSendMessagesRequest: ({ id, messages }) => ({
+          body: { id, messages, currentRoute: routeRef.current },
+        }),
+      }),
+    [api],
+  );
+
+  const chat = useChat<AgentUIMessage>({
+    transport,
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
+    onToolCall: async ({ toolCall }) => {
+      const { toolName } = toolCall;
+      const helpers = helpersRef.current;
+      if (!helpers) return;
+      if (!isAgentToolName(toolName)) {
+        void helpers.addToolOutput({
+          state: "output-error",
+          tool: toolName,
+          toolCallId: toolCall.toolCallId,
+          errorText: "unknown-tool",
+        });
+        return;
+      }
+      const policy = policiesRef.current[toolName];
+      // `confirm` waits for the approval UI; everything else resolves now.
+      if (policy === "confirm") return;
+      const output: AgentToolOutput =
+        policy === "disabled"
+          ? { ok: false, reason: "disabled-by-policy" }
+          : await executeTool(toolName, toolCall.input);
+      void helpers.addToolOutput({
+        tool: toolName,
+        toolCallId: toolCall.toolCallId,
+        output,
+      });
+    },
+  });
+  helpersRef.current = chat;
+
+  const [pendingQuotes, setPendingQuotes] = useState<readonly string[]>([]);
+  // Read through a ref so sendText keeps one identity across quote changes.
+  const quotesRef = useRef(pendingQuotes);
+  quotesRef.current = pendingQuotes;
+
+  const sendText = useCallback(
+    (text: string) => {
+      const trimmed = text.trim();
+      if (trimmed.length === 0) return;
+      turnRef.current = newSequence();
+      const quotes = quotesRef.current;
+      const message =
+        quotes.length > 0 ? buildQuotedMessage(quotes, trimmed) : trimmed;
+      setPendingQuotes([]);
+      void chat.sendMessage({ text: message });
+    },
+    [chat.sendMessage],
+  );
+
+  const attachQuote = useCallback((rawSelection: string) => {
+    setPendingQuotes((current) =>
+      appendSelection(current, rawSelection, maxPendingSelections),
+    );
+  }, [maxPendingSelections]);
+
+  const reset = useCallback(() => {
+    replayGenerationRef.current += 1;
+    void chat.stop();
+    chat.setMessages([]);
+    chat.clearError();
+    setPendingQuotes([]);
+    turnRef.current = newSequence();
+  }, [chat.stop, chat.setMessages, chat.clearError]);
+
+  const respondToToolCall = useCallback<UseAgentChatReturn["respondToToolCall"]>(
+    ({ toolName, toolCallId, input, approved }) => {
+      void (async () => {
+        const output: AgentToolOutput = approved
+          ? { ...(await executeTool(toolName, input)), approvedByUser: true }
+          : { ok: false, reason: "denied-by-user" };
+        await chat.addToolOutput({ tool: toolName, toolCallId, output });
+      })();
+    },
+    [chat.addToolOutput, executeTool],
+  );
+
+  const stop = useCallback(() => void chat.stop(), [chat.stop]);
+
+  const removeQuote = useCallback(
+    (index: number) =>
+      setPendingQuotes((current) =>
+        current.filter((_, currentIndex) => currentIndex !== index),
+      ),
+    [],
+  );
+
+  const clearQuotes = useCallback(() => setPendingQuotes([]), []);
+
   const replayActions = useCallback<UseAgentChatReturn["replayActions"]>(
     async (actions) => {
       if (actions.length === 0) return [];
@@ -389,15 +440,14 @@ export function useAgentChat(options: UseAgentChatOptions): UseAgentChatReturn {
 
       replayRunningRef.current = true;
       const generation = replayGenerationRef.current;
-      const counters: ExecutionCounters = {
-        navigations: 0,
-        interactions: 0,
-      };
+      // Its own sequence: fresh caps, and no route transition inherited from
+      // (or leaked back into) the conversation's current turn.
+      const sequence = newSequence();
       const results: AgentReplayResult[] = [];
       let failed = false;
 
       try {
-        for (const [index, action] of queued.entries()) {
+        for (const action of queued) {
           if (failed) {
             results.push({
               action,
@@ -433,34 +483,20 @@ export function useAgentChat(options: UseAgentChatOptions): UseAgentChatReturn {
 
           let output: AgentToolOutput;
           try {
-            output = executeToolWithCounters(
+            // Waiting for a replayed navigation to land is not special-cased
+            // here: the next dependent action settles the sequence's pending
+            // route itself, exactly as it does during a live turn.
+            output = await executeInSequence(
               action.toolName,
               action.input,
-              counters,
+              sequence,
+              generation,
             );
           } catch {
             output = { ok: false, reason: "execution-failed" };
           }
           results.push({ action, output });
-          if (!output.ok) {
-            failed = true;
-            continue;
-          }
-
-          const next = queued[index + 1];
-          if (action.toolName === "navigate" && next !== undefined) {
-            const route = stringField(action.input, "route");
-            if (
-              route === undefined ||
-              !(await waitForRoute(route, generation))
-            ) {
-              results[results.length - 1] = {
-                action,
-                output: { ok: false, reason: "route-transition-failed" },
-              };
-              failed = true;
-            }
-          }
+          if (!output.ok) failed = true;
         }
         results.push(
           ...overflow.map((action) => ({
@@ -474,7 +510,7 @@ export function useAgentChat(options: UseAgentChatOptions): UseAgentChatReturn {
         replayRunningRef.current = false;
       }
     },
-    [executeToolWithCounters, waitForRoute],
+    [executeInSequence],
   );
 
   // One memoized wrapper so the individually stable callbacks above actually

@@ -11,8 +11,9 @@ remain in consumer-owned server code.
 
 - `registry/`: headless chat core, dock/sidebar/spotlight shells, composable UI
   parts, CSS tokens, split selection-to-chat/context controls, resize behavior,
-  grouped local action replay, tool policies, and a hardened Fetch-standard
-  server handler with a separate Node HTTP bridge.
+  optional detached (floating, draggable) dock/sidebar windows, grouped local
+  action replay, tool policies, and a hardened Fetch-standard server handler with
+  a separate Node HTTP bridge.
 - `apps/playground/`: Vite site and same-process `/api/agent` middleware using a
   deterministic mock model. Vite serves the UI and API on port 5173. The fixture
   site is Basalt Bouldering Co. (five routes); every Agent knob lives in a
@@ -20,7 +21,7 @@ remain in consumer-owned server code.
 - `packages/cli/`: zero-runtime-dependency `@tuann72/agent-ui`. `agent-ui init`
   copies bundled templates, writes `.agent.json` with file hashes, and adds
   required dependencies without replacing consumer ranges.
-- Tests: 175 unit/component tests and 15 Playwright flows.
+- Tests: 192 unit/component tests and 20 Playwright flows.
 
 Not built yet: `agent-ui add`, `sync`, `doctor`, and `update`; markdown
 ingestion; framework adapters/example apps; provider factories; durable rate
@@ -34,8 +35,8 @@ server-executed `search_content`).
 
 - `registry/src/core/`: `use-agent-chat.ts` owns conversation behavior and
   security, including replay execution; `tool-policy.ts`, lifecycle, resize,
-  selection, shortcut, highlighting, interaction, and focus utilities live
-  beside it.
+  detach placement, selection, shortcut, highlighting, interaction, target
+  resolution, and focus utilities live beside it.
 - `registry/src/components/`: `AgentChat`, `AgentProvider`, three shells,
   selection popover, grouped action presentation, icons, and composable chat
   parts.
@@ -121,10 +122,24 @@ Do not weaken these constraints.
 4. **Navigation:** accept only exact manifest routes. Reject schemes, hosts,
    protocol-relative and unknown URLs; navigate through the injected router,
    default to confirmation, and enforce the per-turn cap.
+   Page actions are also *ordered*: `highlight` and `interact` only reach the
+   current route. A target registered on another route is rejected with
+   `target-on-another-route` plus its `expectedRoute`, never a bare
+   `unknown-target`, so the model can navigate and retry; the prompt and the
+   tool descriptions state the same rule. Within a sequence, a dependent action
+   waits for a preceding navigation to commit (`ActionSequence.pendingRoute`)
+   before touching the DOM. This is one mechanism shared by live turns and
+   replay — do not reintroduce a replay-only special case.
 5. **Targets and clicks:** resolve only `data-agent-target` IDs from the current
-   route. Clicking additionally requires `interactive: true`, confirmation by
-   default, a native enabled button-like element, and a per-turn cap. Never
-   click links or text inputs.
+   route, and only through `core/target.ts`'s `findTargetElement` — never a
+   model-supplied selector. Clicking additionally requires `interactive: true`,
+   confirmation by default, a native enabled button-like element, and a per-turn
+   cap. Never click links or text inputs.
+   `core/interact.ts` is deliberately swappable: `isInteractable` (the guard),
+   `applyInteraction` (the effect), and `INTERACTION_VERB` (the announcement) are
+   the three edits that turn it into a different interaction. Enforcement must
+   stay out of that file, so editing them can change what happens to an allowed
+   element but never widen which elements the model may reach.
 6. **Context is data:** delimit markdown and catalogs, tell the model embedded
    instructions are untrusted, neutralize every `<agent-...` sequence, escape
    attributes, and collapse catalog newlines.
@@ -181,16 +196,38 @@ Do not weaken these constraints.
   2.5px lower than the shorter launcher; opening and closing brand motion
   bridges that vertical delta over the frame transition.
 - Cosmetic options are props (`appearance`, `icon`, `title`, shell header,
-  separator, side, launcher, `starterPrompts`, `selectionSide`), not component
-  forks. Cosmetic slots follow the same rule: `AgentMessages` takes
+  separator, side, launcher, `starterPrompts`, `selectionSide`, `detachable`),
+  not component forks. Cosmetic slots follow the same rule: `AgentMessages` takes
   `emptyState`, `AutoApproveButton` takes children in place of its glyph. Each
   cosmetic default lives once, in the provider or shell. `AgentChat` forwards
   `undefined`, never a second copy.
 - `starterPrompts` are contextual task suggestions rendered before the first
-  message by `AgentMessages` and the spotlight. They are presentation over
-  `agent.sendText`: a starter is an ordinary user turn, so it grants no
-  capability a typed message would not. The empty default is the module
-  constant `NO_STARTER_PROMPTS`, not `[]` inline. See identity discipline.
+  message by `AgentMessages` and the spotlight, through the exported
+  `AgentStarterPrompts` part (which takes an optional `prompts` list and renders
+  nothing when empty). They are presentation over `agent.sendText`: a starter is
+  an ordinary user turn, so it grants no capability a typed message would not.
+  Both defaults are module constants in `core/starter-prompts.ts`, never `[]`
+  inline: `NO_STARTER_PROMPTS` is the provider default, and
+  `DEFAULT_STARTER_PROMPTS` is opt-in, site-agnostic boilerplate. Nothing
+  shipped in `registry/` or the CLI templates may mention the playground
+  fixture — the gym's copy belongs to `apps/playground/src/site/`. See identity
+  discipline.
+- **Detaching** is one mechanism shared by the dock and the sidebar: provider
+  state (`detachable`, `detached`, `setDetached`, following the same
+  controlled/uncontrolled `useFlag` pattern as `open`), `core/use-detach.ts` for
+  placement and the title-bar drag (`useDetachedPanel`, over the pure
+  `clampPosition`), and one `.agent-detached` CSS block. It is opt-in
+  (`detachable` defaults to false) so the standard header gains no button by
+  default. Closing re-attaches, because the collapsed launcher lives on a screen
+  edge. Position stays null until the first drag so CSS owns the resting spot
+  (`--agent-detached-inset`), mirroring `--agent-sidebar-width`. A detached
+  sidebar must stop pushing the page, drop the border that only faced the page,
+  and paint an opaque header like the dock's — floating, that header owns the
+  panel's rounded top corners (see `--agent-panel-band`). The drag reaches
+  `AgentHeader` through the *shell* context (`useAgentDragHandle`), not through
+  props, and its pointer-down ignores presses on controls — pointer capture
+  would otherwise retarget the release and swallow the header buttons' clicks.
+  The spotlight is already a centered overlay and takes no part in this.
 - The selection popover attaches to one of four sides (`selectionSide`:
   `top | bottom | left | right`, default `top`). The chosen side is honored,
   never flipped: `selectionAnchor` picks that edge's midpoint and
@@ -241,7 +278,8 @@ cannot be reached from the panel or a URL, nobody will find it.
   falls back per field instead of failing to load.
 - **New props get a knob.** When registry gains a cosmetic or policy prop, add
   it to `PlaygroundConfig` and the panel in the same change. Knobs that do not
-  apply to the current shell set `binding.hidden` rather than sitting dead.
+  apply to the current shell set `binding.hidden` rather than sitting dead
+  (`side`, `launcher`, and `detachable` all do).
 - **The panel is Tweakpane, so React stays the source of truth.** The pane is
   constructed once against a mutable draft; bindings lift changes up through
   `onConfigChange`; external changes flow back through `pane.refresh()` behind
@@ -295,6 +333,12 @@ cannot be reached from the panel or a URL, nobody will find it.
 - The dock completes that shared exit lifecycle from the frame's `height`
   `transitionend`; width and height finish together. Ignore bubbled child
   transitions and do not unmount on the first arbitrary transition event.
+  A transition only exists when the height actually changes, so a close that
+  begins before the frame has grown (Escape while it is still opening) gets no
+  `transitionend` at all. The dock detects that case by reading the
+  pre-transition height in a layout effect and calls the lifecycle's
+  `finishClose()` directly. Any new event-driven exit needs the same escape
+  hatch, and `finishClose` — not a duration timer — is it.
 - Focus restoration must run after the launcher remount commit, not directly
   in a close handler. Use the lifecycle hook's `restoreFocusTo`, which all three
   shells do: dock/sidebar pass their launcher ref, the spotlight passes the
@@ -302,6 +346,13 @@ cannot be reached from the panel or a URL, nobody will find it.
 - `.agent-glass` intentionally has no border or box-shadow: combining either
   with `backdrop-filter` causes a pale unfiltered perimeter. Do not add a rim
   or edge without discussing the design. Solid dock panels are also borderless.
+- Two rounded boxes at the same radius each antialias that curve separately, so
+  a header sitting in a panel's rounded top corner lets the panel's surface leak
+  through the corner as a pale arc. `--agent-panel-band` fixes it by painting a
+  header-coloured band, as tall as the corner, as the panel's topmost background
+  *layer* — one element's layers share one edge antialias, so a child or wrapper
+  cannot do this job. Shells that opt in must keep their header opaque and the
+  same colour as the band; an e2e test asserts the two match.
 - Agent layers on a fixed z-scale: highlight overlay 30 < dock/sidebar 40 <
   spotlight 50 < selection popover 70. The overlay marks page content and must
   stay below every Agent surface.
@@ -328,9 +379,12 @@ cannot be reached from the panel or a URL, nobody will find it.
 - The playground's route lives in `window.history`, so anything that calls
   `navigate` twice is now visible as a doubled back-button step. Keep history
   mutation out of React state updaters: StrictMode invokes those twice.
-- A replayed navigation must wait until `currentRoute` matches and one committed
-  paint has passed before resolving a following target. Otherwise a highlight
-  or interaction can incorrectly run against the previous route's DOM.
+- Any navigation — live turn or replay — must settle before a following target
+  resolves: wait until `currentRoute` matches and one committed paint has passed,
+  or a highlight/interaction runs against the previous route's DOM. That wait is
+  `ActionSequence.pendingRoute`, carried by the same struct as the per-turn caps
+  so a sequence's route transition and its budget share one lifetime. A replay
+  builds its own sequence, so it neither spends nor leaks the live turn's state.
 
 ## Testing placement
 
@@ -338,7 +392,9 @@ cannot be reached from the panel or a URL, nobody will find it.
   boundaries: colocated `*.test.ts`, run by `bun test`.
 - Shared shell behavior: table-driven
   `components/variants.contract.test.tsx` in Happy DOM. Assert visible behavior,
-  not implementation details. Selection split-control behavior belongs in
+  not implementation details. Detach is shared by the two stacking shells, so its
+  block iterates the drivers with the spotlight filtered out rather than being
+  duplicated per shell. Selection split-control behavior belongs in
   `components/selection-popover.test.tsx`.
 - Real browser/streaming/tool flows: `apps/playground/e2e/*.e2e.ts` with the
   deterministic mock. Keep the `.e2e.ts` suffix so Bun does not collect them.
@@ -347,6 +403,13 @@ cannot be reached from the panel or a URL, nobody will find it.
   reuses an already-running 5183 server, so kill any manual one first or the
   suite tests a stale module graph. Replay coverage must assert that no new
   `/api/agent` request occurs and that later actions are skipped after failure.
+- Paint-level defects (a pale corner arc, a stray hairline) are asserted as the
+  style contract that removes them — computed `backgroundImage`, border widths,
+  the header colour the corner band must match — not as a screenshot. A baseline
+  of a one-pixel arc records the renderer's antialiasing, so it fails on the next
+  machine; `dock-*-closed.png` is deliberately the only pixel baseline, and it is
+  a whole-launcher shape. Diagnose such a defect by measuring pixels in a
+  throwaway test, then land the contract assertion.
 - Configure e2e tests through the query string (`goto("/?variant=sidebar")`),
   never by driving the control panel. Tests stay independent of Tweakpane's DOM
   and exercise the same URL path a demo setup uses. Reach for the panel only

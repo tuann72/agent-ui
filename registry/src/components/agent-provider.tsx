@@ -8,6 +8,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { NO_STARTER_PROMPTS } from "../core/starter-prompts";
+import type { AgentPointerDragProps } from "../core/use-resize-drag";
 import {
   useAgentChat,
   type UseAgentChatOptions,
@@ -32,6 +34,14 @@ export interface AgentContextValue {
   /** Whether the shell panel is open. */
   open: boolean;
   setOpen: (open: boolean) => void;
+  /** Whether this shell offers a detach control at all. */
+  detachable: boolean;
+  /**
+   * Whether the panel is currently a free-floating, draggable window instead of
+   * a panel pinned to its screen edge. Always false when `detachable` is false.
+   */
+  detached: boolean;
+  setDetached: (detached: boolean) => void;
   /** Display name shown in launchers, headers, and the selection popover. */
   title: string;
   /** Brand mark rendered next to the title everywhere one appears. */
@@ -69,23 +79,43 @@ export function useAgentContext(): AgentContextValue {
  */
 interface AgentShellContextValue {
   close: () => void;
+  /**
+   * Set by a shell only while its panel is detached: the pointer handlers that
+   * move the floating window. `AgentHeader` becomes the title bar by spreading
+   * them, so a custom header opts in the same way through `useAgentDragHandle`.
+   */
+  dragHandleProps: AgentPointerDragProps | null;
 }
 const AgentShellContext = createContext<AgentShellContextValue | null>(null);
 
 /** Each shell wraps its panel contents in this so `<CloseButton>` can animate. */
 export function AgentShellProvider({
   close,
+  dragHandleProps = null,
   children,
 }: {
   close: () => void;
+  dragHandleProps?: AgentPointerDragProps | null;
   children: ReactNode;
 }) {
-  const value = useMemo(() => ({ close }), [close]);
+  const value = useMemo(
+    () => ({ close, dragHandleProps }),
+    [close, dragHandleProps],
+  );
   return (
     <AgentShellContext.Provider value={value}>
       {children}
     </AgentShellContext.Provider>
   );
+}
+
+/**
+ * The drag handlers for a detached panel's title bar, or null when the panel is
+ * attached (or the shell is not detachable). Spread the result onto whatever
+ * element should move the window.
+ */
+export function useAgentDragHandle(): AgentPointerDragProps | null {
+  return useContext(AgentShellContext)?.dragHandleProps ?? null;
 }
 
 /**
@@ -115,13 +145,46 @@ export interface AgentProviderProps extends UseAgentChatOptions {
   onOpenChange?: (open: boolean) => void;
   /** Initial open state when uncontrolled. Default `false`. */
   defaultOpen?: boolean;
+  /**
+   * Offer a detach control in the panel header, letting the user pull the dock
+   * or sidebar out into a floating, draggable window. Default `false`, so the
+   * header gains a button only where a host wants one.
+   */
+  detachable?: boolean;
+  /** Controlled detached state. Omit for uncontrolled. */
+  detached?: boolean;
+  onDetachedChange?: (detached: boolean) => void;
+  /** Initial detached state when uncontrolled. Default `false`. */
+  defaultDetached?: boolean;
   children: ReactNode;
 }
 
-// Module constants, not inline defaults: default parameter values are
-// re-created every render and would invalidate the context memo below.
+/**
+ * The controlled/uncontrolled flag pattern, once. `open` and `detached` both
+ * follow it, so a host can drive either, both, or neither, and they behave
+ * identically from the outside.
+ */
+function useFlag(
+  value: boolean | undefined,
+  onChange: ((next: boolean) => void) | undefined,
+  initial: boolean,
+): [boolean, (next: boolean) => void] {
+  const [uncontrolled, setUncontrolled] = useState(initial);
+  const controlled = value !== undefined;
+  const set = useCallback(
+    (next: boolean) => {
+      if (!controlled) setUncontrolled(next);
+      onChange?.(next);
+    },
+    [controlled, onChange],
+  );
+  return [value === undefined ? uncontrolled : value, set];
+}
+
+// A module constant, not an inline default: default parameter values are
+// re-created every render and would invalidate the context memo below. The
+// starter-prompt defaults live in core/starter-prompts.ts for the same reason.
 const DEFAULT_ICON = <AgentIcon />;
-const NO_STARTER_PROMPTS: readonly AgentStarterPrompt[] = [];
 
 export function AgentProvider({
   title = "Agent",
@@ -132,20 +195,34 @@ export function AgentProvider({
   open: controlledOpen,
   onOpenChange,
   defaultOpen = false,
+  detachable = false,
+  detached: controlledDetached,
+  onDetachedChange,
+  defaultDetached = false,
   children,
   ...chatOptions
 }: AgentProviderProps) {
   const agent = useAgentChat(chatOptions);
-  const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen);
-  const isControlled = controlledOpen !== undefined;
-  const open = isControlled ? controlledOpen : uncontrolledOpen;
+  const [open, setOpenFlag] = useFlag(controlledOpen, onOpenChange, defaultOpen);
+  const [detachedFlag, setDetached] = useFlag(
+    controlledDetached,
+    onDetachedChange,
+    defaultDetached,
+  );
+  // A shell that was never given `detachable` can still be handed `detached` by
+  // a stale host; gate on the capability so one prop is enough to turn the whole
+  // feature off.
+  const detached = detachable && detachedFlag;
 
   const setOpen = useCallback(
     (next: boolean) => {
-      if (!isControlled) setUncontrolledOpen(next);
-      onOpenChange?.(next);
+      // Closing re-attaches. The collapsed launcher lives on a screen edge, so
+      // a panel that stayed detached would shrink back into a tab that is not
+      // where the panel was.
+      if (!next) setDetached(false);
+      setOpenFlag(next);
     },
-    [isControlled, onOpenChange],
+    [setOpenFlag, setDetached],
   );
 
   const askAboutSelection = useCallback(
@@ -162,6 +239,9 @@ export function AgentProvider({
       agent,
       open,
       setOpen,
+      detachable,
+      detached,
+      setDetached,
       title,
       icon,
       appearance,
@@ -174,6 +254,9 @@ export function AgentProvider({
       agent,
       open,
       setOpen,
+      detachable,
+      detached,
+      setDetached,
       title,
       icon,
       appearance,

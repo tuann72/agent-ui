@@ -49,6 +49,7 @@ export default function App() {
         launcher={config.launcher}
         header={config.header}
         inputSeparator={config.inputSeparator}
+        detachable={config.detachable}
         selectionAsk={config.selectionAsk}
         selectionSide={config.selectionSide}
         starterPrompts={starterPrompts}
