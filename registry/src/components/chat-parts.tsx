@@ -5,11 +5,13 @@ import {
   useRef,
   useState,
   type FormEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
   type RefObject,
 } from "react";
 import { getToolName, isToolUIPart, type ToolUIPart } from "ai";
 import { motionDisabled } from "../core/motion";
+import type { AgentPointerDragProps } from "../core/use-resize-drag";
 import {
   isAgentToolName,
   type AgentReplayAction,
@@ -18,14 +20,22 @@ import {
 } from "../core/use-agent-chat";
 import type {
   AgentAppearance,
+  AgentStarterPrompt,
   AgentToolOutput,
   AgentTools,
   AgentUIMessage,
 } from "../core/types";
-import { AgentShellProvider, useAgentContext, useCloseAgent } from "./agent-provider";
 import {
+  AgentShellProvider,
+  useAgentContext,
+  useAgentDragHandle,
+  useCloseAgent,
+} from "./agent-provider";
+import {
+  AttachIcon,
   CheckIcon,
   CloseIcon,
+  DetachIcon,
   RefreshIcon,
   SendIcon,
   StopIcon,
@@ -149,6 +159,18 @@ function toolPhrases(name: AgentToolName, input: unknown) {
   };
 }
 
+/**
+ * Why an action failed, in the transcript. The one reason worth expanding is a
+ * target that lives on another page: naming that route explains both the
+ * failure and what Agent should do next.
+ */
+function failureDetail(output: AgentToolOutput): string {
+  if (output.reason === "target-on-another-route" && output.expectedRoute) {
+    return `it is on ${output.expectedRoute}, not this page`;
+  }
+  return output.reason ?? "failed";
+}
+
 function ToolPartView({ part }: { part: AgentToolPart }) {
   const { agent } = useAgentContext();
   const toolName = getToolName(part);
@@ -220,7 +242,7 @@ function ToolPartView({ part }: { part: AgentToolPart }) {
         <CloseIcon size={12} />{" "}
         {output.reason === "denied-by-user"
           ? phrases.denied
-          : `${phrases.failed} — ${output.reason ?? "failed"}`}
+          : `${phrases.failed} — ${failureDetail(output)}`}
       </div>
     );
   }
@@ -252,7 +274,7 @@ function replayResultText(result: AgentReplayResult): string {
   }
   const phrases = toolPhrases(result.action.toolName, result.action.input);
   if (result.output.ok) return `Replayed: ${phrases.done}`;
-  return `Replay stopped: ${phrases.failed} — ${result.output.reason ?? "failed"}`;
+  return `Replay stopped: ${phrases.failed} — ${failureDetail(result.output)}`;
 }
 
 function AgentActionGroup({ parts }: { parts: AgentToolPart[] }) {
@@ -324,6 +346,47 @@ function AgentActionGroup({ parts }: { parts: AgentToolPart[] }) {
 // dock/sidebar default header is just the standard arrangement of them.
 
 /**
+ * The suggested-task buttons shown before a conversation starts.
+ *
+ * A starter is presentation over `agent.sendText`: clicking one sends an
+ * ordinary user turn, so it grants no capability a typed message would not.
+ * `AgentMessages` and the spotlight render this for you; it is exported so a
+ * custom layout can place the suggestions somewhere else (under the header, in
+ * an empty-state illustration) or feed it a different list than the provider's
+ * — `DEFAULT_STARTER_PROMPTS` is the site-agnostic set to start from.
+ *
+ * Renders nothing when there are no prompts, so it is always safe to mount.
+ */
+export function AgentStarterPrompts({
+  prompts,
+  className = "",
+}: {
+  prompts?: readonly AgentStarterPrompt[];
+  className?: string;
+}) {
+  const { agent, starterPrompts } = useAgentContext();
+  const items = prompts ?? starterPrompts;
+  if (items.length === 0) return null;
+  return (
+    <div
+      className={`agent-starter-prompts ${className}`}
+      aria-label="Suggested tasks"
+    >
+      {items.map(({ label, prompt }) => (
+        <button
+          key={`${label}:${prompt}`}
+          type="button"
+          className="agent-btn-ghost"
+          onClick={() => agent.sendText(prompt)}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
  * The scrolling conversation. Defaults to the full history from context; pass
  * `messages` to render a filtered view (the spotlight shows only the latest
  * exchange), and `emptyState` for your own before-first-message copy.
@@ -337,7 +400,7 @@ export function AgentMessages({
   className?: string;
   emptyState?: ReactNode;
 }) {
-  const { agent, starterPrompts } = useAgentContext();
+  const { agent } = useAgentContext();
   const messages = messagesProp ?? agent.messages;
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastMessage = messages.at(-1);
@@ -371,20 +434,7 @@ export function AgentMessages({
               to another section.
             </p>
           )}
-          {starterPrompts.length > 0 && (
-            <div className="agent-starter-prompts" aria-label="Suggested tasks">
-              {starterPrompts.map(({ label, prompt }) => (
-                <button
-                  key={`${label}:${prompt}`}
-                  type="button"
-                  className="agent-btn-ghost"
-                  onClick={() => agent.sendText(prompt)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
+          <AgentStarterPrompts />
         </div>
       )}
       {messages.map((message) => (
@@ -582,6 +632,29 @@ export function NewChatButton() {
   );
 }
 
+/**
+ * Pull the panel out into a floating window, or put it back on its edge.
+ * Renders nothing unless the shell was given `detachable`, so it is safe to
+ * leave in a custom header arrangement.
+ */
+export function DetachButton() {
+  const { detachable, detached, setDetached } = useAgentContext();
+  if (!detachable) return null;
+  const label = detached ? "Attach chat panel" : "Detach chat panel";
+  return (
+    <button
+      type="button"
+      className="agent-icon-btn"
+      aria-pressed={detached}
+      aria-label={label}
+      title={label}
+      onClick={() => setDetached(!detached)}
+    >
+      {detached ? <AttachIcon /> : <DetachIcon />}
+    </button>
+  );
+}
+
 /** Close button; plays the shell's exit animation via the shell context. */
 export function CloseButton() {
   const close = useCloseAgent();
@@ -600,18 +673,38 @@ export function CloseButton() {
 
 /**
  * The dock/sidebar title bar. With no children it renders the standard
- * arrangement (brand, auto-approve, new chat, close); pass children to compose
- * your own — group action buttons in a `<AgentActions>` for the right-aligned
- * layout.
+ * arrangement (brand, auto-approve, detach, new chat, close); pass children to
+ * compose your own — group action buttons in a `<AgentActions>` for the
+ * right-aligned layout.
+ *
+ * While the shell's panel is detached, this is also the window's drag handle.
+ * The handlers ignore presses that land on a control, so the header's own
+ * buttons keep working: pointer capture would otherwise retarget the release and
+ * swallow their clicks.
  */
 export function AgentHeader({ children }: { children?: ReactNode }) {
+  const drag = useAgentDragHandle();
+  const dragProps = drag
+    ? {
+        ...drag,
+        onPointerDown: (event: ReactPointerEvent<HTMLElement>) => {
+          if ((event.target as Element).closest("button, input, a")) return;
+          drag.onPointerDown(event);
+        },
+      }
+    : {};
   return (
-    <header className="agent-panel-header">
+    <header
+      className="agent-panel-header"
+      data-agent-drag={drag ? "" : undefined}
+      {...dragProps}
+    >
       {children ?? (
         <>
           <AgentTitle />
           <AgentActions>
             <AutoApproveButton />
+            <DetachButton />
             <NewChatButton />
             <CloseButton />
           </AgentActions>
@@ -639,15 +732,18 @@ export function AgentBody({ autoFocus = true }: { autoFocus?: boolean }) {
  */
 export function AgentPanelContents({
   close,
+  dragHandleProps,
   header,
   children,
 }: {
   close: () => void;
+  /** Set by the shell only while detached; see `AgentShellProvider`. */
+  dragHandleProps?: AgentPointerDragProps | null;
   header?: ReactNode;
   children?: ReactNode;
 }) {
   return (
-    <AgentShellProvider close={close}>
+    <AgentShellProvider close={close} dragHandleProps={dragHandleProps}>
       {children ?? (
         <>
           {resolveHeader(header, <AgentHeader />)}

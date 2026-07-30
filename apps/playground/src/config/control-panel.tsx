@@ -74,8 +74,9 @@ export function ControlPanel({
   const conditional = useRef<{
     side: BladeApi | null;
     launcher: BladeApi | null;
+    detachable: BladeApi | null;
     highlight: BladeApi[];
-  }>({ side: null, launcher: null, highlight: [] });
+  }>({ side: null, launcher: null, detachable: null, highlight: [] });
 
   useEffect(() => {
     const container = containerRef.current;
@@ -107,6 +108,9 @@ export function ControlPanel({
     bind(shell, "header", {});
     bind(shell, "inputSeparator", { label: "input rule" });
     bind(shell, "starterPrompts", { label: "starter tasks" });
+    conditional.current.detachable = bind(shell, "detachable", {
+      label: "detachable",
+    });
     // Remounting the shell is how the playground clears a conversation, so a
     // flow can be re-run without a page reload.
     shell
@@ -203,7 +207,12 @@ export function ControlPanel({
     return () => {
       pane.dispose();
       paneRef.current = null;
-      conditional.current = { side: null, launcher: null, highlight: [] };
+      conditional.current = {
+        side: null,
+        launcher: null,
+        detachable: null,
+        highlight: [],
+      };
     };
   }, []);
 
@@ -223,9 +232,11 @@ export function ControlPanel({
   // Hide knobs that do not apply to the current shell instead of leaving dead
   // controls on screen — the panel should read as documentation.
   useEffect(() => {
-    const { side, launcher, highlight } = conditional.current;
+    const { side, launcher, detachable, highlight } = conditional.current;
     if (side) side.hidden = config.variant === "spotlight";
     if (launcher) launcher.hidden = config.variant !== "sidebar";
+    // The spotlight is already a floating overlay: nothing to detach from.
+    if (detachable) detachable.hidden = config.variant === "spotlight";
     for (const binding of highlight) binding.hidden = !config.highlightOverride;
   }, [config.variant, config.highlightOverride]);
 

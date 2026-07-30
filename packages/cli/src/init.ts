@@ -190,30 +190,46 @@ export async function runInit(argv: string[], cliVersion: string): Promise<void>
     console.log("\n⚠ No react dependency found — agent-ui requires React 19.");
   }
 
+  const src = dir.replace(/\/+$/, "");
   console.log("\nNext steps:");
   console.log(`  1. ${installCommand(pm)}`);
   console.log(
-    `  2. Import the styles once (e.g. in your root layout): import "./${dir.replace(/\/+$/, "")}/styles.css"`,
+    `  2. Import the styles once (e.g. in your root layout): import "./${src}/styles.css"`,
   );
   console.log(
-    `  3. Render <AgentChat …> from ${dir} and mount createAgentHandler (from ${dir}/server) on your API route.`,
+    `  3. Render <AgentChat api="/api/agent" currentRoute={…} navigate={…} manifest={…} /> from ${dir}.`,
+  );
+  console.log(
+    "  4. Describe your pages: a browser-safe AgentPublicManifest (routes + target ids),",
+  );
+  console.log(
+    `     then withContent(publicManifest, {...}) in a server-only module for the page markdown.`,
+  );
+  console.log(
+    "     Skipping this is why an assistant answers \"that is not in the site content\".",
+  );
+  console.log(
+    `  5. Mount createAgentHandler (from ${src}/server) on POST /api/agent.`,
   );
   if (provider !== "none") {
     const info = PROVIDERS[provider];
     console.log(
-      `  4. Set ${info.env} in your server environment (never expose it to the client),`,
-    );
-    console.log(
-      `     then wire the model: import { ${info.importName} } from "${info.pkg}" and pass`,
+      `     Wire the model there: import { ${info.importName} } from "${info.pkg}" and pass`,
     );
     console.log(
       `     model: ${info.importName}("${info.defaultModel}") to createAgentHandler.`,
+    );
+    console.log(
+      `  6. Put ${info.env}=... in a server-side .env at your project root, then restart.`,
+    );
+    console.log(
+      "     Never prefix it VITE_ or NEXT_PUBLIC_ — those publish the value to the browser.",
     );
   } else {
     console.log("");
     for (const line of noProviderHint(pm)) console.log(line);
   }
   console.log(
-    "\nDocs, manifest format, and server-mounting examples (Next.js, Vite): https://github.com/tuann72/agent-ui#readme\n",
+    "\nDocs, manifest format, context-authoring guidance, and server-mounting examples\n(Next.js, Vite): https://github.com/tuann72/agent-ui#readme\n",
   );
 }

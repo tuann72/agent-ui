@@ -80,8 +80,17 @@ describe("validateTarget", () => {
     });
   });
 
-  test("rejects a target from a different route", () => {
-    expect(validateTarget(manifest, "/", "pricing-comparison").reason).toBe(
+  test("names the route a target from another page lives on", () => {
+    // Not just "unknown": the model needs to know navigation is the fix.
+    expect(validateTarget(manifest, "/", "pricing-comparison")).toEqual({
+      ok: false,
+      reason: "target-on-another-route",
+      expectedRoute: "/pricing",
+    });
+  });
+
+  test("rejects a target no page registers", () => {
+    expect(validateTarget(manifest, "/", "nowhere").reason).toBe(
       "unknown-target",
     );
   });
@@ -112,8 +121,16 @@ describe("validateInteraction", () => {
     ).toBe("target-not-interactive");
   });
 
-  test("rejects an interactive target from a different route", () => {
-    expect(validateInteraction(manifest, "/", "start-order").reason).toBe(
+  test("names the route an interactive target from another page lives on", () => {
+    expect(validateInteraction(manifest, "/", "start-order")).toEqual({
+      ok: false,
+      reason: "target-on-another-route",
+      expectedRoute: "/pricing",
+    });
+  });
+
+  test("rejects an interactive target no page registers", () => {
+    expect(validateInteraction(manifest, "/", "nowhere").reason).toBe(
       "unknown-target",
     );
   });

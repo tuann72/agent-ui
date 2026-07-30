@@ -18,6 +18,9 @@ npx run that reuses a cached older CLI silently scaffolds older source.
 - A streaming chat UI in three variants (dock, sidebar, spotlight) built as thin
   shells over one shared headless core, plus shadcn-style composable parts
   (`AgentProvider`, `AgentHeader`, `AgentMessages`, `AgentInput`, and so on).
+- Optional detach mode: the dock and sidebar can lift off their screen edge into
+  a floating, draggable window (`detachable`), and a detached sidebar gives the
+  page its width back.
 - Markdown-based site knowledge, safe page navigation, element highlighting, and
   opt-in element clicking. Every tool is gated by a per-tool policy
   (`auto` / `confirm` / `disabled`) enforced in the headless core.
@@ -86,7 +89,23 @@ import { AgentChat } from "./agent";
 import { createAgentHandler } from "./agent/server";
 ```
 
-Full docs, the manifest format, and examples:
+Two more steps decide whether it actually works, and both are easy to skip:
+
+4. **Describe your pages.** Write a browser-safe `AgentPublicManifest` (routes,
+   titles, descriptions, target ids), then `withContent(publicManifest, {...})`
+   in a server-only module to attach the page markdown and keywords. This
+   manifest is the assistant's *entire* knowledge of your site — nothing is
+   crawled from the DOM — so an empty one means "that is not in the site
+   content" as the answer to everything.
+5. **Put the provider key in a server-side `.env`** at your project root, using
+   the exact variable name the adapter expects (`OPENAI_API_KEY`,
+   `ANTHROPIC_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`), and restart. Never
+   prefix it `VITE_` or `NEXT_PUBLIC_`: those prefixes exist to ship a value to
+   the browser. You never pass the key to `createAgentHandler` — the adapter
+   reads the environment itself.
+
+Full docs, the manifest format, guidance on writing content the model can use,
+and a troubleshooting table:
 <https://github.com/tuann72/agent-ui#readme>
 
 ## Roadmap

@@ -38,6 +38,11 @@ export interface AgentChatProps extends UseAgentChatOptions {
   selectionSide?: AgentSelectionSide;
   /** Contextual task suggestions shown before the first message. */
   starterPrompts?: readonly AgentStarterPrompt[];
+  /**
+   * Offer a detach control in the dock/sidebar header, so the user can pull the
+   * panel out into a floating, draggable window. Default `false`.
+   */
+  detachable?: boolean;
 }
 
 /**
@@ -61,6 +66,7 @@ export function AgentChat({
   selectionAsk = true,
   selectionSide,
   starterPrompts,
+  detachable,
   ...chatOptions
 }: AgentChatProps) {
   const shell =
@@ -85,6 +91,7 @@ export function AgentChat({
       appearance={appearance}
       starterPrompts={starterPrompts}
       selectionSide={selectionSide}
+      detachable={detachable}
     >
       {selectionAsk && <AgentSelectionPopover />}
       {shell}

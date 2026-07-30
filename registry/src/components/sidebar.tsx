@@ -8,6 +8,7 @@ import {
   keyboardResizeDelta,
   type AgentSide,
 } from "../core/resize";
+import { useDetachedPanel } from "../core/use-detach";
 import { useResizeDrag } from "../core/use-resize-drag";
 import { useShellLifecycle } from "../core/use-shell-lifecycle";
 import { useSidebarPush } from "../core/use-sidebar-push";
@@ -40,7 +41,8 @@ export function AgentSidebar({
   inputSeparator = true,
   children,
 }: AgentSidebarProps) {
-  const { open, setOpen, title, icon, appearance } = useAgentContext();
+  const { open, setOpen, detached, title, icon, appearance } =
+    useAgentContext();
   // null until dragged: the panel and the page's push margin both read
   // --agent-sidebar-width, so the CSS default drives them until a resize sets it.
   const [width, setWidth] = useState<number | null>(null);
@@ -53,7 +55,13 @@ export function AgentSidebar({
     restoreFocusTo: launcherRef,
   });
   useFocusTrap(panelRef, showPanel);
-  useSidebarPush({ open, side, width });
+  // A detached panel no longer occupies the edge, so the page takes its space
+  // back — the push margin is what "attached" means for this shell.
+  useSidebarPush({ open: open && !detached, side, width });
+  const { position, dragHandleProps } = useDetachedPanel({
+    detached,
+    elementRef: panelRef,
+  });
 
   const sideClass = side === "left" ? "agent-side-left" : "agent-side-right";
 
@@ -102,7 +110,12 @@ export function AgentSidebar({
           role="dialog"
           aria-label={`${title} assistant`}
           data-agent-ui="sidebar-panel"
-          className={`${surfaceClass(appearance)} agent-sidebar-panel ${sideClass}${inputSeparator ? "" : " agent-no-separator"}${closing ? " agent-closing" : ""}`}
+          className={`${surfaceClass(appearance)} agent-sidebar-panel ${sideClass}${inputSeparator ? "" : " agent-no-separator"}${detached ? " agent-detached" : ""}${closing ? " agent-closing" : ""}`}
+          style={
+            detached && position
+              ? { left: position.x, top: position.y, right: "auto" }
+              : undefined
+          }
           onAnimationEnd={panelAnimationEnd}
         >
           <button
@@ -112,7 +125,11 @@ export function AgentSidebar({
             onKeyDown={resizeWithKeyboard}
             {...resizeHandle}
           />
-          <AgentPanelContents close={close} header={header}>
+          <AgentPanelContents
+            close={close}
+            dragHandleProps={detached ? dragHandleProps : null}
+            header={header}
+          >
             {children}
           </AgentPanelContents>
         </div>
