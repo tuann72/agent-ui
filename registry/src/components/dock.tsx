@@ -77,7 +77,7 @@ export function AgentDock({
     restoreFocusTo: launcherRef,
   });
   useFocusTrap(panelRef, showPanel);
-  const { position, dragHandleProps } = useDetachedPanel({
+  const { positionStyle, dragHandleProps } = useDetachedPanel({
     detached,
     elementRef: frameRef,
   });
@@ -167,9 +167,7 @@ export function AgentDock({
     height: frameSize.height,
     // Detached, the frame is placed in viewport coordinates. Until the first
     // drag the stylesheet owns the resting spot, so no offsets are written.
-    ...(detached && position
-      ? { left: position.x, top: position.y, right: "auto", bottom: "auto" }
-      : null),
+    ...positionStyle,
   } satisfies CSSProperties;
 
   return (
