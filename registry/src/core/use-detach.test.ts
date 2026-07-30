@@ -39,4 +39,19 @@ describe("clampPosition", () => {
       clampPosition({ x: 616, y: 352 }, panel, viewport),
     ).toEqual({ x: 616, y: 352 });
   });
+
+  test("lands on whole pixels, and never outside the viewport", () => {
+    // Pointer deltas are fractional, and a panel at a fractional offset shows a
+    // hairline of surface where its clip and its background disagree.
+    expect(clampPosition({ x: 100.4, y: 60.6 }, panel, viewport)).toEqual({
+      x: 100,
+      y: 61,
+    });
+    // Rounding must not push a flush panel past the far edge.
+    const flush = { width: 383.5, height: 447.5 };
+    expect(clampPosition({ x: 9999, y: 9999 }, flush, viewport)).toEqual({
+      x: viewport.width - 384,
+      y: viewport.height - 448,
+    });
+  });
 });

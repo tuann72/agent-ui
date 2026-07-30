@@ -502,19 +502,54 @@ test("a panel whose header paints its top corners backs them with the header's o
 
     // The band is the panel's topmost background layer, so its colour has to
     // track the header's: anything lighter shows through the header's corner.
-    const bandColour = await panel.evaluate(
+    const band = await panel.evaluate(
       (element) =>
         getComputedStyle(element).backgroundImage.match(
-          /^linear-gradient\((rgba?\([^)]*\))/,
-        )?.[1],
+          /^linear-gradient\((rgba?\([^)]*\))\s+([\d.]+)px/,
+        ),
     );
     const headerColour = await header.evaluate(
       (element) => getComputedStyle(element).backgroundColor,
     );
-    expect(bandColour).toBe(headerColour);
+    expect(band?.[1]).toBe(headerColour);
     // Opaque, or the surface still reads through it.
     expect(headerColour).not.toMatch(/rgba\(.*,\s*0?\.\d+\)/);
+
+    // The band has to reach the header's full height: a shorter one leaves the
+    // surface behind the sides of the bar, where a rounded overflow clip that
+    // rounds a pixel differently from the panel's background exposes it as a
+    // hairline. Taller would paint a strip below the bar instead.
+    const headerHeight = (await header.boundingBox())?.height;
+    expect(Number(band?.[2])).toBe(headerHeight);
   }
+});
+
+test("resizing commits whole pixels, so no panel edge lands mid-pixel", async ({
+  page,
+}) => {
+  await page.goto("/?panel=0");
+  await openLauncher(page);
+  // The frame's width interpolates while it grows, so measure the resting size:
+  // data-state leaves "opening" on the height transition's end.
+  await expect(page.locator('[data-agent-ui="dock-frame"]')).toHaveAttribute(
+    "data-state",
+    "open",
+  );
+  const panel = page.locator('[data-agent-ui="dock-panel"]');
+  const handle = page.getByRole("button", { name: "Resize chat panel" });
+  const grab = await handle.boundingBox();
+  if (!grab) throw new Error("resize handle was not measurable");
+
+  // Fractional deltas, the way a pointer or a trackpad delivers them.
+  await page.mouse.move(grab.x + grab.width / 2, grab.y + grab.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grab.x - 31.4, grab.y - 15.9, { steps: 5 });
+  await page.mouse.up();
+
+  const box = await panel.boundingBox();
+  if (!box) throw new Error("resized panel was not measurable");
+  expect(box.width).toBe(Math.round(box.width));
+  expect(box.height).toBe(Math.round(box.height));
 });
 
 test("a detached sidebar drops the border that only faced the page", async ({

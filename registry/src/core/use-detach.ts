@@ -21,17 +21,23 @@ interface Size {
  * may park it somewhere its own title bar can no longer be grabbed. Clamping to
  * the panel's size rather than to a margin means a panel larger than the
  * viewport pins to the top-left instead of drifting off the other edge.
+ *
+ * Whole pixels, for the reason `clampSize` rounds: a panel at a fractional
+ * offset lets its rounded overflow clip and its background land on different
+ * device pixels, which shows as a hairline of surface down an edge.
  */
 export function clampPosition(
   position: DetachedPosition,
   size: Size,
   viewport: Size,
 ): DetachedPosition {
-  const maxX = Math.max(0, viewport.width - size.width);
-  const maxY = Math.max(0, viewport.height - size.height);
+  // Floored, not rounded: rounding a fractional bound up would let a flush
+  // panel hang half a pixel off the far edge.
+  const maxX = Math.max(0, Math.floor(viewport.width - size.width));
+  const maxY = Math.max(0, Math.floor(viewport.height - size.height));
   return {
-    x: Math.min(Math.max(position.x, 0), maxX),
-    y: Math.min(Math.max(position.y, 0), maxY),
+    x: Math.min(Math.max(Math.round(position.x), 0), maxX),
+    y: Math.min(Math.max(Math.round(position.y), 0), maxY),
   };
 }
 
