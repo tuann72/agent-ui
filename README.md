@@ -155,6 +155,11 @@ import { publicManifest } from "./manifest";
 `styles.css` is plain CSS; Tailwind is optional. Tailwind v4 users can also
 import `./agent/tailwind.css` for token-backed utilities.
 
+Give `navigate` your router's client-side push. Conversations live in React
+state and are never persisted, so a `navigate` that reloads the document ends
+the thread mid-answer — which is the one place the no-persistence default is
+felt as a bug rather than a privacy property. See [Status](#status).
+
 One import is all you need: `styles.css` pulls in `theme.css` itself. Edit
 `theme.css` for colors, radius, and sizing — that is the file meant to be
 yours, and the one `agent-ui update` leaves alone.
@@ -353,11 +358,16 @@ export default defineConfig(({ mode }) => {
 });
 ```
 
+Both Vite-specific steps above — the `loadEnv` bridge and the `types` entry
+below — are printed by `init` when it finds a `vite.config.*`, so this section
+is here to explain them rather than to be found in time.
+
 `create vite` with the `react-ts` template pins `"types": ["vite/client"]` in
 `tsconfig.app.json`, and an explicit `types` array suppresses the automatic
 `@types/*` pickup. The scaffolded `server/node.ts` then fails to compile with
 missing `node:http` and `node:stream` types even though `init` added
-`@types/node` correctly. Add `"node"` to that array:
+`@types/node` correctly — at your next build, long after anyone reads this. Add
+`"node"` to that array:
 
 ```jsonc
 // tsconfig.app.json
@@ -400,6 +410,37 @@ Three rules, in order of how often they are broken:
 
 Restart the dev server after editing `.env` — adapters read the environment at
 startup, so a running process keeps the old value.
+
+#### Put a rate limit in front of the route
+
+**`POST /api/agent` is unauthenticated and spends money on every request.
+Bounding requests per client is your job, and nothing in agent-ui does it for
+you.** Deploy the route without a limit and one script can run up a provider
+bill against your key.
+
+What the handler *does* enforce is shape, not volume: `allowedOrigins` rejects
+a cross-origin caller with `403 origin-not-allowed` (defaulting to same-origin),
+and the `limits` fields cap body bytes, message count, and message length with
+`413`. None of that stops a same-origin caller — or anything replaying your
+origin header — from sending a valid request in a loop. There is no per-IP or
+per-session counter in the handler, by design: a durable one needs storage that
+a scaffolded file cannot assume.
+
+Use whatever your deployment already has, in front of the handler:
+
+| Where you deploy | Reach for |
+| --- | --- |
+| Vercel | Vercel Firewall rate limiting, or `@upstash/ratelimit` in the route |
+| Cloudflare | A Rate Limiting rule on the route path |
+| Your own Node/Hono server | `hono-rate-limiter`, `express-rate-limit`, or nginx `limit_req` |
+| Anywhere | Require a session and rate limit per account, not per IP |
+
+Pair it with a spend cap in your provider's dashboard. A limit you set at the
+provider holds even when the one in front of your route is misconfigured.
+
+If your assistant is only for signed-in users, check the session in the route
+before calling the handler — `createAgentHandler` returns a `Response`, so an
+early `return new Response(null, { status: 401 })` is the whole integration.
 
 ### 5. Give the assistant an identity (optional)
 
@@ -453,6 +494,7 @@ Prefer rolling aliases when available because dated model IDs can retire.
 | `it is on /x, not this page` | The model tried to point at another page's element | Working as intended — it should navigate first; if it keeps skipping that, `navigate` is `disabled` or its per-turn cap is `0` |
 | Nothing happens on a click request | Target not `interactive: true`, or not a native button | Both are required; Agent never clicks links or text inputs |
 | Streaming reply says only "An error occurred." | The real error is masked by design | Read the server log, or pass `onError` during local debugging only |
+| The thread empties after Agent navigates | `navigate` did a full page load, and messages live in React state | Pass a client-side `navigate` (`router.push`) rather than one that reloads the document; see [Status](#status) on persistence |
 
 ## Configure the UI
 
@@ -690,7 +732,7 @@ default glyph. Context hooks cover the rest: `useAgentContext`,
 
 ```bash
 bun run typecheck    # registry, CLI, and playground TypeScript
-bun test             # 213 unit and component-contract tests
+bun test             # 225 unit and component-contract tests
 bun run test:e2e     # 21 Chromium flows; starts Vite automatically
 bun run cli:build    # rebuild CLI output and bundled templates
 ```
@@ -748,6 +790,12 @@ selection-to-chat/context controls, grouped local action replay, hardened server
 handler, Node bridge, `agent-ui init`, mock and real-provider playground paths,
 unit/component tests, and Playwright tests.
 
+Not included, by design: **rate limiting** (put one in front of the route —
+see [Put a rate limit in front of the route](#put-a-rate-limit-in-front-of-the-route))
+and **conversation persistence** (messages live in React state, so a reload
+starts a new thread and nothing is written to `localStorage`, `sessionStorage`,
+or a cookie). Both are deployment decisions that a scaffolded file cannot make
+for you: one needs shared storage, the other needs a retention policy.
+
 Planned: `agent-ui add`, `sync`, `doctor`, and `update`; generated markdown
-manifests; framework adapters/examples; provider factories; durable rate
-limiting.
+manifests; framework adapters/examples; provider factories.

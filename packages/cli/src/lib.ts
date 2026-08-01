@@ -227,6 +227,108 @@ export function pickRootLayout(
 }
 
 /**
+ * Vite config names, in the order Vite itself resolves them. Presence of one is
+ * the definitive "this is a Vite project" signal — firmer than a root layout,
+ * since `src/main.tsx` also shows up in CRA and hand-rolled bundler setups.
+ */
+export const VITE_CONFIG_FILES = [
+  "vite.config.ts",
+  "vite.config.js",
+  "vite.config.mts",
+  "vite.config.mjs",
+] as const;
+
+/** The project's Vite config, or `undefined`. Same probe split as `pickRootLayout`. */
+export function pickViteConfig(
+  exists: (file: string) => boolean,
+): string | undefined {
+  return VITE_CONFIG_FILES.find(exists);
+}
+
+/**
+ * TypeScript configs that can carry the `compilerOptions.types` array, nearest
+ * to the app source first: `create vite`'s `react-ts` template splits the root
+ * config into `tsconfig.app.json` and `tsconfig.node.json`, and the app one is
+ * what compiles `src/`.
+ */
+export const TSCONFIG_FILES = ["tsconfig.app.json", "tsconfig.json"] as const;
+
+/**
+ * Whether a tsconfig's `types` array would hide `@types/node` from the compiler.
+ *
+ * An explicit `compilerOptions.types` array replaces the automatic `@types/*`
+ * pickup rather than adding to it, and `create vite --template react-ts` pins
+ * `"types": ["vite/client"]`. The scaffolded `server/node.ts` then fails to
+ * compile on `node:http` and `node:stream` even though init added `@types/node`
+ * correctly — a first `bun run build`, long after anyone read the README.
+ *
+ * Matched by regex, not `JSON.parse`: the template ships these files with
+ * comments, making them JSONC, which does not parse. A `"types"` string inside
+ * a comment ahead of the real key would fool this — costing one unnecessary
+ * warning line, never a wrong file write.
+ */
+export function needsNodeTypes(tsconfigText: string): boolean {
+  const types = /"types"\s*:\s*\[([^\]]*)\]/.exec(tsconfigText);
+  if (types === null) return false;
+  return !/["']node["']/.test(types[1] ?? "");
+}
+
+/**
+ * Bridging `.env` into `process.env` for a Vite project, printed by init rather
+ * than linked.
+ *
+ * Vite parses `.env` into `import.meta.env` and only for `VITE_`-prefixed names,
+ * while the provider adapter runs in the Node process and reads `process.env`.
+ * Nothing connects the two by default, so a correctly-placed key produces
+ * `AI_LoadAPIKeyError` on the very first message — the failure lands one step
+ * after the last one init used to describe.
+ */
+export function viteEnvHint(config: string): string[] {
+  return [
+    "  Vite does not put .env into process.env, which is where the adapter reads",
+    "  the key from — without this the first message fails with AI_LoadAPIKeyError.",
+    `  Add to ${config}:`,
+    "",
+    '    import { defineConfig, loadEnv } from "vite";',
+    "    export default defineConfig(({ mode }) => {",
+    '      Object.assign(process.env, loadEnv(mode, process.cwd(), ""));',
+    "      return { ...your existing config... };",
+    "    });",
+    "",
+    "  The empty prefix loads unprefixed names too. This stays server-side —",
+    "  never copy it into `define` or any client-visible config.",
+  ];
+}
+
+/**
+ * The lowest React major the templates run on. Both runtime dependencies accept
+ * it (`@ai-sdk/react` peers on `^18 || ^19`, `react-markdown` on `>=18`) and no
+ * React 19-only API appears in the templates, so the previous "requires 19" was
+ * a claim rather than a constraint. Development and tests run on 19.
+ */
+export const MIN_REACT_MAJOR = 18;
+
+/**
+ * Warning text when the consumer's React cannot run the templates, or `undefined`
+ * when it can.
+ *
+ * The major is read off the front of whatever range is declared (`^18.2.0`,
+ * `>=18`, `18`), which covers the shapes a package.json actually carries. Ranges
+ * that parse to nothing — a git URL, `workspace:*`, a tag — warn about nothing:
+ * an unreadable range is not evidence of a wrong version, and a false alarm here
+ * costs more trust than the check buys.
+ */
+export function reactVersionWarning(pkg: PackageJsonLike): string | undefined {
+  const range = pkg.dependencies?.react ?? pkg.peerDependencies?.react;
+  if (range === undefined) {
+    return `No react dependency found — agent-ui requires React ${MIN_REACT_MAJOR} or newer.`;
+  }
+  const major = Number(/\d+/.exec(range)?.[0]);
+  if (Number.isNaN(major) || major >= MIN_REACT_MAJOR) return undefined;
+  return `react ${range} is below the React ${MIN_REACT_MAJOR} the templates need — upgrade before rendering <AgentChat>.`;
+}
+
+/**
  * The `styles.css` specifier as written *from* `layout`. A bare
  * `./${dir}/styles.css` is only correct for an importer sitting at the project
  * root, which `src/main.tsx` and `app/layout.tsx` never do — from `src/main.tsx`

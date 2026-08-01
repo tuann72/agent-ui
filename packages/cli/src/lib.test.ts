@@ -10,11 +10,16 @@ import {
   isProviderId,
   isTemplateFile,
   mergeDependencies,
+  MIN_REACT_MAJOR,
+  needsNodeTypes,
   noProviderHint,
   pickRootLayout,
+  pickViteConfig,
   PROVIDERS,
+  reactVersionWarning,
   ROOT_LAYOUT_FILES,
   styleImportSpecifier,
+  viteEnvHint,
 } from "./lib";
 
 /** `pickRootLayout`'s fs probe, backed by a fixed set instead of a disk. */
@@ -230,6 +235,90 @@ describe("pickRootLayout", () => {
         /^\.{1,2}\/.*styles\.css$/,
       );
     }
+  });
+});
+
+describe("pickViteConfig", () => {
+  test("finds a config under any of Vite's extensions", () => {
+    expect(pickViteConfig(present("vite.config.ts"))).toBe("vite.config.ts");
+    expect(pickViteConfig(present("vite.config.mjs"))).toBe("vite.config.mjs");
+  });
+
+  test("reports nothing for a project that is not Vite", () => {
+    expect(pickViteConfig(present("next.config.js", "src/main.tsx"))).toBeUndefined();
+  });
+
+  test("names the config it found, so the hint points at a real file", () => {
+    const hint = viteEnvHint("vite.config.mts").join("\n");
+    expect(hint).toContain("vite.config.mts");
+    expect(hint).toContain("loadEnv(mode, process.cwd(), \"\")");
+    // The prefix warning has to travel with the snippet it qualifies.
+    expect(hint).toContain("never copy it into `define`");
+  });
+});
+
+describe("needsNodeTypes", () => {
+  test("flags create-vite's pinned array, which hides @types/node", () => {
+    expect(needsNodeTypes('{"compilerOptions":{"types":["vite/client"]}}')).toBe(
+      true,
+    );
+  });
+
+  test("passes an array that already lists node", () => {
+    expect(
+      needsNodeTypes('{"compilerOptions":{"types":["vite/client","node"]}}'),
+    ).toBe(false);
+  });
+
+  test("passes a config with no types array, where pickup is automatic", () => {
+    expect(needsNodeTypes('{"compilerOptions":{"strict":true}}')).toBe(false);
+  });
+
+  test("reads JSONC, which is what the template actually ships", () => {
+    const jsonc = `{
+      "compilerOptions": {
+        /* Bundler mode */
+        "moduleResolution": "bundler",
+        "types": ["vite/client"]
+      }
+    }`;
+    expect(needsNodeTypes(jsonc)).toBe(true);
+  });
+});
+
+describe("reactVersionWarning", () => {
+  test("warns when react is absent entirely", () => {
+    expect(reactVersionWarning({})).toContain("No react dependency");
+  });
+
+  test("warns when the declared major is below the floor", () => {
+    expect(reactVersionWarning({ dependencies: { react: "^17.0.2" } })).toContain(
+      "below the React 18",
+    );
+  });
+
+  test("passes the floor and anything above it", () => {
+    expect(
+      reactVersionWarning({ dependencies: { react: `^${MIN_REACT_MAJOR}.2.0` } }),
+    ).toBeUndefined();
+    expect(reactVersionWarning({ dependencies: { react: ">=18" } })).toBeUndefined();
+    expect(
+      reactVersionWarning({ dependencies: { react: "^19.2.7" } }),
+    ).toBeUndefined();
+  });
+
+  test("stays quiet on ranges it cannot read, rather than guessing", () => {
+    // A workspace protocol or git URL is not evidence of a wrong version, and a
+    // false alarm costs more than the check is worth.
+    expect(
+      reactVersionWarning({ dependencies: { react: "workspace:*" } }),
+    ).toBeUndefined();
+  });
+
+  test("accepts react declared as a peer dependency, as a library would", () => {
+    expect(
+      reactVersionWarning({ peerDependencies: { react: "^19" } }),
+    ).toBeUndefined();
   });
 });
 

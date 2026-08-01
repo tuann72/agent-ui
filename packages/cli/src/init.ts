@@ -25,11 +25,16 @@ import {
   installCommand,
   isProviderId,
   mergeDependencies,
+  needsNodeTypes,
   noProviderHint,
   pickRootLayout,
+  pickViteConfig,
   PROVIDERS,
   type ProviderId,
+  reactVersionWarning,
   styleImportSpecifier,
+  TSCONFIG_FILES,
+  viteEnvHint,
 } from "./lib";
 
 /** Bundled at build time by scripts/bundle-templates.ts, next to dist/. */
@@ -190,8 +195,19 @@ export async function runInit(argv: string[], cliVersion: string): Promise<void>
     writeFileSync(pkgPath, JSON.stringify(devMerge.pkg, null, indent) + "\n");
   }
 
-  const hasReact = Boolean(devMerge.pkg.dependencies?.react);
+  const src = dir.replace(/\/+$/, "");
   const pm = detectPackageManager(readdirSync(cwd));
+  const exists = (file: string) => existsSync(join(cwd, file));
+  const layout = pickRootLayout(exists);
+  const viteConfig = pickViteConfig(exists);
+  const reactWarning = reactVersionWarning(devMerge.pkg);
+
+  // The compiler-visibility gap that `@types/node` in devDependencies does not
+  // close, checked against the nearest config that owns the app's `types`.
+  const tsconfig = TSCONFIG_FILES.find(exists);
+  const pinnedTypes =
+    tsconfig !== undefined &&
+    needsNodeTypes(readFileSync(join(cwd, tsconfig), "utf8"));
 
   console.log(`\nAgent scaffolded into ${dir} (${fileCount} files).`);
   console.log("Wrote .agent.json (paths, provider, install-time file hashes).");
@@ -202,12 +218,24 @@ export async function runInit(argv: string[], cliVersion: string): Promise<void>
   if (kept.length > 0) {
     console.log(`Already in your package.json (left untouched): ${kept.join(", ")}.`);
   }
-  if (!hasReact) {
-    console.log("\n⚠ No react dependency found — agent-ui requires React 19.");
+  if (reactWarning !== undefined) {
+    console.log(`\n⚠ ${reactWarning}`);
+  }
+  if (pinnedTypes) {
+    console.log(
+      `\n⚠ ${tsconfig} pins an explicit "types" array, which replaces automatic`,
+    );
+    console.log(
+      `  @types/* pickup — so ${src}/server/node.ts will not compile on your next`,
+    );
+    console.log(
+      `  build, even though @types/node was installed. Add "node" to that array,`,
+    );
+    console.log(
+      `  alongside what is already there:  "types": ["vite/client", "node"]`,
+    );
   }
 
-  const src = dir.replace(/\/+$/, "");
-  const layout = pickRootLayout((file) => existsSync(join(cwd, file)));
   const caveat = layout
     ? ""
     : "\n     (that path is from the project root — adjust it to the importing file).";
@@ -245,6 +273,12 @@ export async function runInit(argv: string[], cliVersion: string): Promise<void>
     console.log(
       "     Never prefix it VITE_ or NEXT_PUBLIC_ — those publish the value to the browser.",
     );
+    // Printed rather than linked: the failure it prevents lands one step after
+    // the .env step above, which is too late to go looking for a README.
+    if (viteConfig !== undefined) {
+      console.log("");
+      for (const line of viteEnvHint(viteConfig)) console.log(line);
+    }
   } else {
     console.log("");
     for (const line of noProviderHint(pm)) console.log(line);

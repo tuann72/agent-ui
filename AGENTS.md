@@ -24,11 +24,12 @@ remain in consumer-owned server code.
   every question it cannot ask must be answered from what the project already
   states — the provider comes from the adapter in `package.json`, not from a
   default — so `--force` never downgrades a fact that was already right.
-- Tests: 213 unit/component tests and 21 Playwright flows.
+- Tests: 225 unit/component tests and 21 Playwright flows.
 
 Not built yet: `agent-ui add`, `sync`, `doctor`, and `update`; markdown
-ingestion; framework adapters/example apps; provider factories; durable rate
-limiting.
+ingestion; framework adapters/example apps; provider factories.
+Deliberately out of scope, not a backlog: rate limiting (invariant 7) and
+conversation persistence (invariant 16).
 Those CLI commands currently report that they are unavailable. ADR 003's
 registered action registry is accepted but unimplemented. The client tool set
 is still exactly `navigate`, `highlight`, and `interact` (plus the
@@ -107,6 +108,10 @@ are selected with `--provider openai|anthropic`; `--model` overrides the model.
   including unused-code and unchecked-index checks.
 - Pinned stack: AI SDK v5 (`ai@^5`, `@ai-sdk/react@^2`), `zod@^4`, React 19,
   `react-markdown@^10`, `remark-gfm@^4`, and Tailwind v4.
+- Development runs React 19; the *supported* floor for consumers is React 18
+  (`MIN_REACT_MAJOR`), which both runtime deps accept. Adding a React 19-only
+  API is therefore a breaking change for consumers — raise the floor and the
+  documented requirement in the same commit, or do not add it.
 
 ## Architecture invariants
 
@@ -150,6 +155,11 @@ Do not weaken these constraints.
 7. **Request hardening:** allowlist message parts; enforce byte/body, count,
    length, output, step, and duration caps; validate origin and authorization;
    abort on disconnect; never buffer beyond the limit or log prompts/secrets.
+   The handler bounds request *shape*, never *volume* — rate limiting needs
+   shared storage a scaffolded file cannot assume, so it is the consumer's job
+   and the docs must say so plainly. Do not let it drift back onto a roadmap
+   list, where a live cost exposure reads as a feature we owe rather than a gap
+   they must cover.
 8. **Policies:** tools are `auto | confirm | disabled`. Defaults are highlight
    `auto`, navigate `confirm`, interact `confirm`. Auto-approve may upgrade
    `confirm` only; it never re-enables `disabled`. Raising a policy must also
@@ -193,6 +203,22 @@ Do not weaken these constraints.
     contiguity: the SDK emits `step-start` between steps, so a turn that
     navigates and then highlights would split into sections describing one
     piece of work, for a reason the transcript never shows.
+16. **No client persistence:** the transcript lives in React state and is never
+    written to `localStorage`, `sessionStorage`, IndexedDB, or a cookie. A page
+    the assistant can read aloud is a page whose conversation may contain
+    anything the user typed, and storing it makes retention a decision agent-ui
+    would be making on the consumer's behalf. The visible cost is that a
+    document-reloading `navigate` ends the thread — fix that with a client-side
+    router push, never by adding storage.
+17. **`init` warns about what breaks after it exits:** the CLI's job does not
+    end at a successful copy. A pinned `tsconfig` `types` array, a React major
+    below `MIN_REACT_MAJOR`, and Vite's missing `.env` → `process.env` bridge
+    all fail later — at the next build or the first message — with errors that
+    name none of these causes. Each detection is a pure predicate in `lib.ts`
+    (`needsNodeTypes`, `reactVersionWarning`, `pickViteConfig`) with the fix
+    printed inline. Do not answer one of these with a link: the failure lands
+    after the last step init described, and a README found afterwards has
+    already cost the debugging session.
 
 ## Component and styling rules
 

@@ -10,6 +10,35 @@ newest templates rather than a cached CLI.
 
 ## [Unreleased]
 
+### Added
+
+- `init` warns about the three things that break *after* it exits successfully,
+  with the fix printed inline rather than linked:
+  - A `tsconfig.app.json` (or `tsconfig.json`) that pins `compilerOptions.types`.
+    An explicit array replaces automatic `@types/*` pickup instead of adding to
+    it, so `create vite --template react-ts`'s `"types": ["vite/client"]` hides
+    the `@types/node` that `init` just installed and the scaffolded
+    `server/node.ts` fails the next build on `node:http`.
+  - A declared React major below 18.
+  - On a project with a `vite.config.*`, the `loadEnv` bridge from `.env` into
+    `process.env`. Vite loads only `VITE_`-prefixed names, and only into
+    `import.meta.env`, while the adapter reads `process.env` — so a correctly
+    placed key still fails the first message with `AI_LoadAPIKeyError`, one step
+    past the last one init used to describe.
+
+### Changed
+
+- The supported React floor is 18, down from 19. `@ai-sdk/react` peers on
+  `^18 || ^19` and `react-markdown` on `>=18`, and no React 19-only API appears
+  in the templates, so the previous requirement was a claim rather than a
+  constraint. Development and tests still run on 19.
+- Documentation states that rate limiting and conversation persistence are the
+  consumer's, not agent-ui's. `POST /api/agent` is unauthenticated and spends
+  money per request; the handler bounds request *shape* (origin, body bytes,
+  message count) and never *volume*. "Durable rate limiting" used to sit in the
+  planned list, which read as a feature owed rather than a live cost exposure to
+  cover before deploying.
+
 ## [0.2.0] - 2026-08-01
 
 The effective initial release on npm. 0.1.0 was published and then unpublished;

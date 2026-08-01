@@ -36,6 +36,13 @@ npx run that reuses a cached older CLI silently scaffolds older source.
   (`createAgentHandler`) with request hardening built in. LLM calls always go
   through your server, and API keys stay in server-side environment variables.
 
+Two things it deliberately leaves to you. **Rate limiting:** the route is
+unauthenticated and spends money per request, and the handler bounds request
+*shape* (origin, body bytes, message count) but not *volume* — put a limit in
+front of it before deploying. **Conversation persistence:** messages live in
+React state and are never written to storage, so a reload starts a new thread.
+The repo README covers both.
+
 ## What `init` does
 
 1. Copies the agent-ui source into your repo (default `src/agent`, change it
@@ -47,9 +54,12 @@ npx run that reuses a cached older CLI silently scaffolds older source.
    `@ai-sdk/openai`, `@ai-sdk/anthropic`, or `@ai-sdk/google` adapter if you
    picked a provider. It also adds `@types/node` and `@types/react` to
    `devDependencies`, since the scaffolded `server/node.ts` imports `node:http`.
-   On a `create vite react-ts` project you must also add `"node"` to
-   `tsconfig.app.json`'s `"types"` array; the repo README's Vite section
-   explains why.
+4. Warns, with the fix inline, about the things that break *after* init
+   succeeds: a `tsconfig` pinning `"types"` (which replaces automatic
+   `@types/*` pickup, so `server/node.ts` fails your next build even though
+   `@types/node` was added), a declared React major below 18, and — when it
+   finds a `vite.config.*` — the `loadEnv` bridge, without which the first
+   message fails with `AI_LoadAPIKeyError`.
 
 Versions you already declare are never overwritten, and nothing moves between
 dependency sections. `init` does not run the install itself; it prints the
@@ -77,7 +87,9 @@ an adapter at `latest` pulls in a newer `ai` major and throws
 
 ## Requirements
 
-- React 19 (with React DOM) and TypeScript 5+ in the consuming project.
+- React 18 or newer (with React DOM) and TypeScript 5+ in the consuming project.
+  `init` warns if your `package.json` declares an older major, or none.
+  Development and tests run on React 19.
 - Node 20 or newer to run the CLI. `bunx` works too.
 - A server route where you can mount a Fetch-standard handler: Next.js route
   handlers, Hono, React Router / Remix resource routes, TanStack Start server
