@@ -1,8 +1,8 @@
 # @tuann72/agent-ui
 
-Scaffold **Agent**, a portable shadcn-style AI assistant for React, into your
-project. Like shadcn/ui, the CLI copies the source into your repo: you own and
-can edit every file, and there is **no runtime npm dependency on agent-ui**.
+Scaffold **Agent**, a portable AI assistant for React, into your project. The
+CLI copies the source into your repo: you own and can edit every file, and there
+is **no runtime npm dependency on agent-ui**.
 
 ```bash
 npx @tuann72/agent-ui@latest init
@@ -16,19 +16,22 @@ npx run that reuses a cached older CLI silently scaffolds older source.
 ## What you get
 
 - A streaming chat UI in three variants (dock, sidebar, spotlight) built as thin
-  shells over one shared headless core, plus shadcn-style composable parts
-  (`AgentProvider`, `AgentHeader`, `AgentMessages`, `AgentInput`, and so on).
+  shells over one shared headless core, plus composable parts you assemble
+  yourself (`AgentProvider`, `AgentHeader`, `AgentMessages`, `AgentInput`, and
+  so on).
 - Optional detach mode: the dock and sidebar can lift off their screen edge into
   a floating, draggable window (`detachable`), and a detached sidebar gives the
   page its width back.
 - Markdown-based site knowledge, safe page navigation, element highlighting, and
   opt-in element clicking. Every tool is gated by a per-tool policy
-  (`auto` / `confirm` / `disabled`) enforced in the headless core.
+  (`auto` / `confirm` / `disabled`) enforced in the headless core. The highlight
+  overlay is themable down to its ring, pulse, and shadow, from CSS tokens or
+  the `highlightOptions` prop.
 - Selection-to-chat with separate Ask-and-open and add-context-only actions,
   plus bounded removable context chips.
-- Grouped page-action history with local replay of successful built-in client
-  actions. Replay makes no model request and re-applies current policies,
-  manifests, DOM checks, and caps.
+- Page-action history grouped one section per response, with a replay button on
+  each action and Replay all actions for the group. Replay makes no model
+  request and re-applies current policies, manifests, DOM checks, and caps.
 - A Fetch-standard `Request` to `Response` server handler
   (`createAgentHandler`) with request hardening built in. LLM calls always go
   through your server, and API keys stay in server-side environment variables.
@@ -44,13 +47,21 @@ npx run that reuses a cached older CLI silently scaffolds older source.
    `@ai-sdk/openai`, `@ai-sdk/anthropic`, or `@ai-sdk/google` adapter if you
    picked a provider. It also adds `@types/node` and `@types/react` to
    `devDependencies`, since the scaffolded `server/node.ts` imports `node:http`.
+   On a `create vite react-ts` project you must also add `"node"` to
+   `tsconfig.app.json`'s `"types"` array; the repo README's Vite section
+   explains why.
 
 Versions you already declare are never overwritten, and nothing moves between
 dependency sections. `init` does not run the install itself; it prints the
 command for you to run.
 
-If you skip the provider (`--yes` and non-interactive runs default to `none`),
-init prints the pinned install command for each adapter. Use those ranges. The
+If your `package.json` already declares an adapter, that is the provider `init`
+assumes — so re-running it (`--force`) at a configured project keeps the model
+wiring and does not rewrite `.agent.json`'s `provider` to `none`. Pass
+`--provider` to override, including `--provider none`.
+
+If there is no adapter and none is chosen (`--yes` and other non-interactive
+runs), init prints the pinned install command for each. Use those ranges. The
 templates run `ai@^5`, which pairs with the `^2` adapter majors, so installing
 an adapter at `latest` pulls in a newer `ai` major and throws
 `AI_UnsupportedModelVersionError` at runtime.
@@ -60,7 +71,7 @@ an adapter at `latest` pulls in a newer `ai` major and throws
 | Flag | Meaning |
 | --- | --- |
 | `--dir <path>` | Where to copy the source (default `src/agent`) |
-| `--provider <name>` | `openai` \| `anthropic` \| `google` \| `none` (default: prompt; `none` when non-interactive) |
+| `--provider <name>` | `openai` \| `anthropic` \| `google` \| `none` (default: the adapter already in your `package.json`, else prompt; non-interactive takes that default) |
 | `-y`, `--yes` | Accept defaults, never prompt |
 | `--force` | Overwrite an existing `.agent.json` or non-empty `--dir` |
 
@@ -69,12 +80,18 @@ an adapter at `latest` pulls in a newer `ai` major and throws
 - React 19 (with React DOM) and TypeScript 5+ in the consuming project.
 - Node 20 or newer to run the CLI. `bunx` works too.
 - A server route where you can mount a Fetch-standard handler: Next.js route
-  handlers, Hono, Remix/React Router resource routes, and similar. Plain Vite
-  SPAs can use the bundled Node bridge (`./agent/server/node`) as dev-server
-  middleware; see the repo README for the snippet.
+  handlers, Hono, React Router / Remix resource routes, TanStack Start server
+  routes, and similar. Plain Vite SPAs can use the bundled Node bridge
+  (`./agent/server/node`) as dev-server middleware; see the repo README for the
+  snippet.
 - Tailwind is **not** required, because `styles.css` is plain CSS. Tailwind v4
   users can additionally import `./agent/tailwind.css` for `bg-agent-*`
   utilities.
+
+Theme in `theme.css`, which `styles.css` imports for you — that file is the one
+meant to be edited, and the one an update leaves alone. Keep your own rules in
+your own stylesheet rather than in `styles.css`, and an upgrade stays a
+no-conflict file replacement.
 
 ## After init
 
@@ -89,6 +106,12 @@ import { AgentChat } from "./agent";
 import { createAgentHandler } from "./agent/server";
 ```
 
+`init` prints step 1 with the specifier already written for your project: it
+looks for a root layout (Next.js `app/layout.tsx`, React Router `app/root.tsx`,
+TanStack `src/routes/__root.tsx`, Vite `src/main.tsx`, and the usual variants)
+and computes the path relative to that file. If it finds none, it prints a
+project-root path and says so, for you to adjust.
+
 Two more steps decide whether it actually works, and both are easy to skip:
 
 4. **Describe your pages.** Write a browser-safe `AgentPublicManifest` (routes,
@@ -102,7 +125,10 @@ Two more steps decide whether it actually works, and both are easy to skip:
    `ANTHROPIC_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`), and restart. Never
    prefix it `VITE_` or `NEXT_PUBLIC_`: those prefixes exist to ship a value to
    the browser. You never pass the key to `createAgentHandler` — the adapter
-   reads the environment itself.
+   reads `process.env` itself. Next.js and Bun load `.env` for you; plain Node
+   running Vite does not, so bridge it with `loadEnv` in `vite.config.ts` or the
+   first request fails with `AI_LoadAPIKeyError`. The repo README has the
+   snippet.
 
 Full docs, the manifest format, guidance on writing content the model can use,
 and a troubleshooting table:

@@ -37,6 +37,13 @@ export interface AgentStarterPrompt {
 export type AgentSelectionSide = "top" | "bottom" | "left" | "right";
 
 /** Consumer-owned appearance and timing for the page highlight overlay. */
+/**
+ * How the highlight overlay looks. Each field writes the matching
+ * `--agent-highlight-*` custom property on the overlay element, so the same
+ * knobs are available globally in `styles.css` and per-call here. `className`
+ * is the escape hatch for anything these fields do not cover: the overlay is a
+ * plain element, and your class can restyle it however you like.
+ */
 export interface AgentHighlightOptions {
   durationMs?: number;
   padding?: number;
@@ -45,7 +52,14 @@ export interface AgentHighlightOptions {
   borderStyle?: "solid" | "dashed" | "dotted";
   backgroundColor?: string;
   ringColor?: string;
+  ringWidth?: number;
   borderRadius?: string;
+  /** Extra box-shadow layered under the ring, e.g. a drop shadow or glow. */
+  boxShadow?: string;
+  /** False keeps the resting ring but stops it pulsing. */
+  pulse?: boolean;
+  /** Added alongside `agent-highlight-overlay`, for full CSS control. */
+  className?: string;
 }
 
 export type ToolPolicy = "auto" | "confirm" | "disabled";

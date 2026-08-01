@@ -1,6 +1,6 @@
 # AGENTS.md: agent-ui contributor context
 
-`agent-ui` is a portable, shadcn-style React assistant toolkit.
+`agent-ui` is a portable React assistant toolkit.
 `@tuann72/agent-ui` copies its source into a consumer repository; consumers own
 that source and have no agent-ui runtime dependency. The shipped assistant is
 named Agent and provides streaming chat, site knowledge, safe navigation,
@@ -20,8 +20,11 @@ remain in consumer-owned server code.
   Tweakpane control panel behind a collapsible left-edge tab.
 - `packages/cli/`: zero-runtime-dependency `@tuann72/agent-ui`. `agent-ui init`
   copies bundled templates, writes `.agent.json` with file hashes, and adds
-  required dependencies without replacing consumer ranges.
-- Tests: 195 unit/component tests and 21 Playwright flows.
+  required dependencies without replacing consumer ranges. It is re-runnable:
+  every question it cannot ask must be answered from what the project already
+  states — the provider comes from the adapter in `package.json`, not from a
+  default — so `--force` never downgrades a fact that was already right.
+- Tests: 213 unit/component tests and 21 Playwright flows.
 
 Not built yet: `agent-ui add`, `sync`, `doctor`, and `update`; markdown
 ingestion; framework adapters/example apps; provider factories; durable rate
@@ -42,7 +45,8 @@ server-executed `search_content`).
   parts.
 - `registry/src/server/`: Fetch handler, context selection, and isolated
   `server/node.ts` bridge. Never import the Node bridge from the Fetch entry.
-- `registry/src/styles.css`: plain CSS and semantic `agent-*` classes.
+- `registry/src/styles.css`: plain CSS and semantic `agent-*` classes, over the
+  tokens in `registry/src/theme.css` that it `@import`s.
   `tailwind.css` is the optional Tailwind v4 token bridge.
 - `apps/playground/server/`: mock model, manifests, and the handler Vite loads
   as middleware. `*.local.ts` real-provider modules are generated and ignored.
@@ -148,7 +152,14 @@ Do not weaken these constraints.
    abort on disconnect; never buffer beyond the limit or log prompts/secrets.
 8. **Policies:** tools are `auto | confirm | disabled`. Defaults are highlight
    `auto`, navigate `confirm`, interact `confirm`. Auto-approve may upgrade
-   `confirm` only; it never re-enables `disabled`.
+   `confirm` only; it never re-enables `disabled`. Raising a policy must also
+   settle the calls it just un-gated: a `confirm` call parks in
+   `input-available` until something answers it, so flipping the toggle while a
+   card is up has to resolve that call — otherwise it only removes the card and
+   the turn waits forever on an answer the UI no longer offers a way to give.
+   Resolve in transcript order (a navigation still settles before a later
+   target) and report plain execution, not `approvedByUser`, so a call the
+   toggle catches is indistinguishable from one that arrived with it already on.
 9. **Spotlight shortcut:** ignore editable elements, IME composition,
    modifiers, and handled events. Escape closes and restores focus.
 10. **Selections:** ignore Agent UI, normalize and deduplicate text, cap each at
@@ -157,7 +168,10 @@ Do not weaken these constraints.
     add-context action uses the same queue without changing shell state.
 11. **Environment boundary:** `.agent.json` defines the consumer project root.
     Content defaults to `content/agent`; secrets load server-side from root
-    `.env`/`.env.local`, never `VITE_` or `NEXT_PUBLIC_` variables.
+    `.env`/`.env.local`, never `VITE_` or `NEXT_PUBLIC_` variables. Adapters
+    read `process.env`, and only some runtimes fill it: Bun (this repo) and
+    Next.js load `.env` automatically, plain Node running Vite does not. Do not
+    assume the Bun behavior when writing consumer-facing docs.
 12. **Provider neutrality:** no provider adapter may appear in a committed
     package manifest. `scripts/dev-real.ts` is neutral; its adapter install and
     generated `*.local.ts` module remain uncommitted.
@@ -171,7 +185,14 @@ Do not weaken these constraints.
     manifests, live-DOM/native-element validation, and fresh capped counters.
     The Replay gesture satisfies `confirm`; `disabled` remains disabled. Cap a
     group at eight, wait for navigation to settle before dependent actions, and
-    fail fast.
+    fail fast. Per-action and whole-group replay are the same call with a
+    different batch size — a single action must never get its own execution
+    path, or the two gestures will drift on exactly these rules.
+15. **One Actions section per response:** every tool call in a message renders
+    in a single group, placed where the first call appeared. Never group by
+    contiguity: the SDK emits `step-start` between steps, so a turn that
+    navigates and then highlights would split into sections describing one
+    piece of work, for a reason the transcript never shows.
 
 ## Component and styling rules
 
@@ -246,18 +267,33 @@ Do not weaken these constraints.
   quote queue; do not add shell-local selection storage. Its compact 38px
   control uses `--agent-selection-radius` for rounded outer corners, independent
   of a host's broader `--agent-radius`.
-- `AgentMessages` groups contiguous tool parts into one action card. The card
-  may render status and the Replay control, but replay selection and execution
-  stay in the headless core. Keep `replayActions` identity-stable like every
-  other value exposed through `useAgentChat`.
+- `AgentMessages` collects every tool part of a message into one action card
+  (invariant 15) through the pure `groupAgentMessageParts`. The card may render
+  status, a per-action Replay button, and the group's Replay all actions, but
+  replay selection and execution stay in the headless core. Both gestures call
+  `agent.replayActions` with a batch — never a second execution path for one
+  action. Keep `replayActions` identity-stable like every other value exposed
+  through `useAgentChat`.
 - Highlight appearance is consumer-themable through `highlightOptions`
   (`AgentHighlightOptions`: duration, padding, border color/width/style, fill,
-  ring, radius), which `runHighlight` applies as `--agent-highlight-*` overrides
-  on the overlay and `interact` reuses for its pre-click flash. It exists so
-  overlays stay visible over media and dark artwork, where the default ring
-  disappears. Values are clamped in `runHighlight` (padding ≤ 64px, border
-  ≤ 16px, duration 250ms–30s); the hook holds the object in a latest-value ref
-  so a new inline object cannot re-render every consumer.
+  ring color/width, radius, box shadow, pulse, and a `className` escape hatch),
+  which `runHighlight` applies as `--agent-highlight-*` overrides on the overlay
+  and `interact` reuses for its pre-click flash. It exists so overlays stay
+  visible over media and dark artwork, where the default ring disappears. Add a
+  new appearance field to the tables in `core/highlight.ts` rather than another
+  `if` — every field maps to exactly one custom property, so the prop and the
+  stylesheet stay one mechanism. Values are clamped in `runHighlight` (padding
+  ≤ 64px, border and ring ≤ 16px, duration 250ms–30s); the hook holds the object
+  in a latest-value ref so a new inline object cannot re-render every consumer.
+  `--agent-highlight-shadow` defaults to a transparent no-op layer, not `none`:
+  it sits in a comma-separated `box-shadow` list where `none` voids the whole
+  declaration.
+- Exit motion fades the transcript before the frame moves. The dock and sidebar
+  collapse toward a screen edge, so `.agent-closing .agent-panel-body` fades
+  over `--agent-close-fade-duration` while the shell plays its own exit. Keep
+  the fade shorter than the shell's exit, and drive it from `closing` — never a
+  second piece of state, since `useShellLifecycle` already withholds `closing`
+  under `prefers-reduced-motion`.
 - Identity discipline: `useAgentChat` returns one memoized object and
   `AgentProvider` memoizes the context value keyed on it. Anything added to
   either must be identity-stable (useCallback/useMemo, latest-value refs, or
@@ -266,6 +302,19 @@ Do not weaken these constraints.
   text; message re-parsing must never scale with stream chunks.
 - `styles.css` stays plain CSS. Theme through `--agent-*` tokens with light and
   `.dark` values meeting WCAG AA; never hardcode theme-dependent colors.
+- **Tokens live in `theme.css`, rules in `styles.css`**, which `@import`s it.
+  The split exists for updates: theming means editing tokens, and `styles.css`
+  is where new rules land every release, so a consumer who themes in place would
+  conflict with us on every upgrade. A new token goes in `theme.css` — putting
+  one in `styles.css` silently re-creates the conflict.
+- Passive containers (action group, context chips) take
+  `--agent-surface-raised`, derived by mixing `--agent-surface-foreground` into
+  `--agent-surface`. Do not tint them with `--agent-accent`: a few percent of a
+  saturated brand color is a wash of that hue, so a warm accent turned the panel
+  pink. Accent is for what asks to be noticed — the approval card keeps it.
+- Transcript strings quote nothing and italicize nothing. A target id is already
+  a distinct token; curly quotes around it add noise a screen reader also reads
+  aloud.
 
 ## Playground fixture and control panel
 
@@ -422,7 +471,10 @@ cannot be reached from the panel or a URL, nobody will find it.
   a running dev/dev-real server and silently test against a real provider. It
   reuses an already-running 5183 server, so kill any manual one first or the
   suite tests a stale module graph. Replay coverage must assert that no new
-  `/api/agent` request occurs and that later actions are skipped after failure.
+  `/api/agent` request occurs and that later actions are skipped after failure,
+  for the per-action button as well as Replay all actions — the point of the
+  per-action path is that it obeys the same rules, so it has to be asserted, not
+  assumed from the shared call.
 - Paint-level defects (a pale corner arc, a stray hairline) are asserted as the
   style contract that removes them — computed `backgroundImage`, border widths,
   the header colour the corner band must match — not as a screenshot. A baseline

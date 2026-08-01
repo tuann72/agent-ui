@@ -4,14 +4,24 @@ import {
   addCommand,
   AGENT_CONFIG_SCHEMA_URL,
   buildAgentConfig,
+  detectInstalledProvider,
   detectPackageManager,
   installCommand,
   isProviderId,
   isTemplateFile,
   mergeDependencies,
   noProviderHint,
+  pickRootLayout,
   PROVIDERS,
+  ROOT_LAYOUT_FILES,
+  styleImportSpecifier,
 } from "./lib";
+
+/** `pickRootLayout`'s fs probe, backed by a fixed set instead of a disk. */
+const present =
+  (...files: string[]) =>
+  (file: string) =>
+    files.includes(file);
 
 describe("isTemplateFile", () => {
   test("accepts runtime source by extension", () => {
@@ -143,6 +153,35 @@ describe("providers", () => {
     expect(hint).toContain("latest");
   });
 
+  test("an already-declared adapter is detected in any dependency section", () => {
+    expect(
+      detectInstalledProvider({ dependencies: { "@ai-sdk/google": "2.0.86" } }),
+    ).toBe("google");
+    expect(
+      detectInstalledProvider({ devDependencies: { "@ai-sdk/openai": "^2" } }),
+    ).toBe("openai");
+    expect(
+      detectInstalledProvider({ peerDependencies: { "@ai-sdk/anthropic": "^2" } }),
+    ).toBe("anthropic");
+  });
+
+  test("no adapter, or only non-adapter deps, detects nothing", () => {
+    expect(detectInstalledProvider({})).toBeUndefined();
+    expect(
+      detectInstalledProvider({ dependencies: { ai: "^5", zod: "^4" } }),
+    ).toBeUndefined();
+  });
+
+  test("two adapters tie-break on PROVIDERS order, not object iteration", () => {
+    const first = (Object.keys(PROVIDERS) as (keyof typeof PROVIDERS)[])[0];
+    expect(
+      detectInstalledProvider({
+        dependencies: { "@ai-sdk/google": "^2" },
+        devDependencies: { "@ai-sdk/openai": "^2" },
+      }),
+    ).toBe(first);
+  });
+
   test("no provider adapter is a dependency of the registry (invariant 12)", () => {
     const registryPkg = JSON.parse(
       readFileSync(
@@ -153,6 +192,74 @@ describe("providers", () => {
     for (const info of Object.values(PROVIDERS)) {
       expect(registryPkg.dependencies?.[info.pkg]).toBeUndefined();
     }
+  });
+});
+
+describe("pickRootLayout", () => {
+  test("recognises each framework's root", () => {
+    expect(pickRootLayout(present("app/layout.tsx"))).toBe("app/layout.tsx");
+    expect(pickRootLayout(present("app/root.tsx"))).toBe("app/root.tsx");
+    expect(pickRootLayout(present("src/routes/__root.tsx"))).toBe(
+      "src/routes/__root.tsx",
+    );
+    expect(pickRootLayout(present("src/main.tsx"))).toBe("src/main.tsx");
+  });
+
+  test("a framework root outranks the generic entry it ships beside", () => {
+    // React Router and TanStack projects routinely keep a src/main.tsx around;
+    // the outermost module still owns the global stylesheet.
+    expect(pickRootLayout(present("src/main.tsx", "app/root.tsx"))).toBe(
+      "app/root.tsx",
+    );
+    expect(
+      pickRootLayout(present("src/App.tsx", "src/routes/__root.tsx")),
+    ).toBe("src/routes/__root.tsx");
+    expect(pickRootLayout(present("src/App.tsx", "src/main.tsx"))).toBe(
+      "src/main.tsx",
+    );
+  });
+
+  test("reports nothing when no candidate exists", () => {
+    expect(pickRootLayout(present())).toBeUndefined();
+    expect(pickRootLayout(present("index.html", "vite.config.ts"))).toBeUndefined();
+  });
+
+  test("every candidate is a path styleImportSpecifier can resolve from", () => {
+    for (const file of ROOT_LAYOUT_FILES) {
+      expect(styleImportSpecifier("src/agent", file)).toMatch(
+        /^\.{1,2}\/.*styles\.css$/,
+      );
+    }
+  });
+});
+
+describe("styleImportSpecifier", () => {
+  test("writes the path from the importing layout, not the project root", () => {
+    expect(styleImportSpecifier("src/agent", "src/main.tsx")).toBe(
+      "./agent/styles.css",
+    );
+    expect(styleImportSpecifier("src/agent", "src/app/layout.tsx")).toBe(
+      "../agent/styles.css",
+    );
+    expect(styleImportSpecifier("src/agent", "app/layout.tsx")).toBe(
+      "../src/agent/styles.css",
+    );
+    expect(styleImportSpecifier("src/agent", "src/routes/__root.tsx")).toBe(
+      "../agent/styles.css",
+    );
+  });
+
+  test("falls back to a project-root path when no layout is known", () => {
+    expect(styleImportSpecifier("src/agent")).toBe("./src/agent/styles.css");
+  });
+
+  test("tolerates a custom --dir, trailing slashes, and Windows separators", () => {
+    expect(styleImportSpecifier("lib/assistant/", "src/main.tsx")).toBe(
+      "../lib/assistant/styles.css",
+    );
+    expect(styleImportSpecifier("src\\agent", "src\\main.tsx")).toBe(
+      "./agent/styles.css",
+    );
   });
 });
 

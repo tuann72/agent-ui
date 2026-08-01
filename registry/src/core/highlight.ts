@@ -9,6 +9,47 @@ interface ActiveHighlight {
 
 let active: ActiveHighlight | null = null;
 
+/**
+ * Appearance options that pass straight through to a custom property, and the
+ * property each one writes. Anything left undefined keeps whatever `styles.css`
+ * declares, so per-call overrides and the global theme use one mechanism.
+ */
+const HIGHLIGHT_CSS_PROPERTIES = [
+  ["borderColor", "--agent-highlight-border-color"],
+  ["borderStyle", "--agent-highlight-border-style"],
+  ["backgroundColor", "--agent-highlight-fill"],
+  ["ringColor", "--agent-highlight-ring-color"],
+  ["borderRadius", "--agent-highlight-radius"],
+  ["boxShadow", "--agent-highlight-shadow"],
+] as const;
+
+/** The same, for options measured in pixels and clamped before they land. */
+const HIGHLIGHT_CSS_WIDTHS = [
+  ["borderWidth", "--agent-highlight-border-width"],
+  ["ringWidth", "--agent-highlight-ring-width"],
+] as const;
+
+function applyHighlightStyle(
+  overlay: HTMLElement,
+  options: AgentHighlightOptions | undefined,
+): void {
+  if (!options) return;
+  for (const [key, property] of HIGHLIGHT_CSS_PROPERTIES) {
+    const value = options[key];
+    if (value) overlay.style.setProperty(property, value);
+  }
+  for (const [key, property] of HIGHLIGHT_CSS_WIDTHS) {
+    const value = options[key];
+    if (value === undefined) continue;
+    overlay.style.setProperty(
+      property,
+      `${Math.min(Math.max(value, 0), 16)}px`,
+    );
+  }
+  if (options.pulse === false) overlay.classList.add("agent-highlight-static");
+  if (options.className) overlay.classList.add(options.className);
+}
+
 function liveRegion(): HTMLElement {
   let region = document.getElementById("agent-live-region");
   if (!region) {
@@ -59,25 +100,7 @@ export function runHighlight(
   const overlay = document.createElement("div");
   overlay.className = "agent-highlight-overlay";
   overlay.setAttribute("aria-hidden", "true");
-  if (options?.borderColor) {
-    overlay.style.setProperty("--agent-highlight-border-color", options.borderColor);
-  }
-  if (options?.backgroundColor) {
-    overlay.style.setProperty("--agent-highlight-fill", options.backgroundColor);
-  }
-  if (options?.ringColor) {
-    overlay.style.setProperty("--agent-highlight-ring-color", options.ringColor);
-  }
-  if (options?.borderRadius) {
-    overlay.style.setProperty("--agent-highlight-radius", options.borderRadius);
-  }
-  if (options?.borderStyle) {
-    overlay.style.setProperty("--agent-highlight-border-style", options.borderStyle);
-  }
-  if (options?.borderWidth !== undefined) {
-    const width = Math.min(Math.max(options.borderWidth, 0), 16);
-    overlay.style.setProperty("--agent-highlight-border-width", `${width}px`);
-  }
+  applyHighlightStyle(overlay, options);
 
   let frame = 0;
   const position = () => {

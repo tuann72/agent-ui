@@ -196,12 +196,19 @@ export function ControlPanel({
         view: "color",
         color: { alpha: true },
       }),
+      bind(highlight, "highlightRingWidth", {
+        label: "ring width",
+        min: 0,
+        max: 16,
+        step: 1,
+      }),
       bind(highlight, "highlightRadius", {
         label: "radius",
         min: 0,
         max: 32,
         step: 1,
       }),
+      bind(highlight, "highlightPulse", { label: "pulse" }),
     ];
 
     return () => {

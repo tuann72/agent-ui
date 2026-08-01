@@ -386,21 +386,21 @@ for (const driver of drivers) {
       );
       await openPanel(driver);
       await sendMessage("start my order");
-      await screen.findByText("Agent wants to click “order-button”");
+      await screen.findByText("Agent wants to click order-button");
       expect(pageClicks).toBe(0);
       fireEvent.click(screen.getByRole("button", { name: "Allow" }));
-      await screen.findByText("You approved clicking “order-button”");
+      await screen.findByText("You approved clicking order-button");
       expect(pageClicks).toBe(1);
       await screen.findByText("Your order is started.");
       const actionGroup = screen.getByRole("region", {
         name: "Agent actions",
       });
       expect(actionGroup).toBeTruthy();
-      const replay = screen.getByRole("button", { name: "Replay actions" });
+      const replay = screen.getByRole("button", { name: "Replay all actions" });
       fireEvent.click(replay);
       fireEvent.click(replay);
       await waitFor(() => expect(pageClicks).toBe(2));
-      await screen.findByText("Replayed: Clicked “order-button”");
+      await screen.findByText("Replayed: Clicked order-button");
     });
 
     test("the auto-approve toggle executes navigation without an approval card", async () => {
@@ -422,6 +422,48 @@ for (const driver of drivers) {
       expect(screen.queryByRole("button", { name: "Allow" })).toBeNull();
       expect(seen).toEqual(["/faq"]);
       await screen.findByText("Done.");
+    });
+
+    test("enabling auto-approve settles a card that is already waiting", async () => {
+      const seen: string[] = [];
+      fetchQueue.push(toolCallReply("navigate", { route: "/faq" }));
+      fetchQueue.push(textReply("Done."));
+      render(<Host variant={driver.variant} onNavigate={(r) => seen.push(r)} />);
+      await openPanel(driver);
+      await sendMessage("take me to the FAQ");
+      // The card is up and the turn is parked on it.
+      await screen.findByText("Agent wants to navigate to /faq");
+      expect(seen).toEqual([]);
+
+      fireEvent.click(
+        screen.getByRole("switch", {
+          name: "Automatically approve Agent's page actions",
+        }),
+      );
+
+      // Raising the policy has to answer the pending call, not just hide the
+      // card — otherwise the turn waits forever on an answer nobody can give.
+      await screen.findByText("Navigated to /faq");
+      expect(seen).toEqual(["/faq"]);
+      expect(screen.queryByRole("button", { name: "Allow" })).toBeNull();
+      await screen.findByText("Done.");
+    });
+
+    test("enabling auto-approve leaves a disabled tool disabled", async () => {
+      fetchQueue.push(toolCallReply("navigate", { route: "/faq" }));
+      fetchQueue.push(textReply("Done."));
+      render(<Host variant={driver.variant} toolPolicy={{ navigate: "disabled" }} />);
+      await openPanel(driver);
+      await sendMessage("take me to the FAQ");
+      await screen.findByText(/disabled-by-policy/);
+
+      fireEvent.click(
+        screen.getByRole("switch", {
+          name: "Automatically approve Agent's page actions",
+        }),
+      );
+      await screen.findByText("Done.");
+      expect(screen.queryByText("Navigated to /faq")).toBeNull();
     });
 
     test("renders the solid surface by default and glass on opt-in", async () => {
@@ -621,12 +663,81 @@ describe("dock specifics", () => {
     expect(
       screen.getAllByRole("region", { name: "Agent actions" }),
     ).toHaveLength(1);
-    fireEvent.click(screen.getByRole("button", { name: "Replay actions" }));
+    fireEvent.click(screen.getByRole("button", { name: "Replay all actions" }));
     await waitFor(() =>
-      expect(screen.getAllByText("Replayed: Highlighted “order-button”")).toHaveLength(
+      expect(screen.getAllByText("Replayed: Highlighted order-button")).toHaveLength(
         2,
       ),
     );
+  });
+
+  test("actions split by narration still render one Actions section", async () => {
+    fetchQueue.push(() =>
+      sse(
+        { type: "start" },
+        {
+          type: "tool-input-available",
+          toolCallId: "call-1",
+          toolName: "highlight",
+          input: { target: "order-button" },
+        },
+        { type: "text-start", id: "t1" },
+        { type: "text-delta", id: "t1", delta: "Now once more." },
+        { type: "text-end", id: "t1" },
+        {
+          type: "tool-input-available",
+          toolCallId: "call-2",
+          toolName: "highlight",
+          input: { target: "order-button" },
+        },
+        { type: "finish" },
+      ),
+    );
+    fetchQueue.push(textReply("Both actions are complete."));
+    render(<Host variant="dock" />);
+    await openPanel(drivers[0]!);
+    await sendMessage("highlight the order button, then say something");
+    await screen.findByText("Both actions are complete.");
+
+    expect(
+      screen.getAllByRole("region", { name: "Agent actions" }),
+    ).toHaveLength(1);
+    expect(
+      screen.getAllByRole("button", { name: "Replay highlighting order-button" }),
+    ).toHaveLength(2);
+  });
+
+  test("one action replays on its own, leaving the rest of the group alone", async () => {
+    let pageClicks = 0;
+    fetchQueue.push(
+      multiToolCallReply(
+        { toolName: "highlight", input: { target: "order-button" } },
+        { toolName: "interact", input: { target: "order-button" } },
+      ),
+    );
+    fetchQueue.push(textReply("Done."));
+    render(
+      <Host
+        variant="dock"
+        toolPolicy={{ interact: "auto" }}
+        onPageButtonClick={() => {
+          pageClicks += 1;
+        }}
+      />,
+    );
+    await openPanel(drivers[0]!);
+    await sendMessage("highlight the order button and click it");
+    await screen.findByText("Done.");
+    expect(pageClicks).toBe(1);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Replay clicking order-button" }),
+    );
+    await screen.findByText("Replayed: Clicked order-button");
+    expect(pageClicks).toBe(2);
+    expect(
+      screen.queryByText("Replayed: Highlighted order-button"),
+    ).toBeNull();
   });
 
   test("replay re-checks a policy that was disabled after the original action", async () => {
@@ -652,7 +763,7 @@ describe("dock specifics", () => {
     await sendMessage("highlight the order button");
     await screen.findByText("Highlighted.");
     fireEvent.click(screen.getByRole("button", { name: "disable-highlight" }));
-    fireEvent.click(screen.getByRole("button", { name: "Replay actions" }));
+    fireEvent.click(screen.getByRole("button", { name: "Replay all actions" }));
     await screen.findByText(/disabled-by-policy/);
   });
 });

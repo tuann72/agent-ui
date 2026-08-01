@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useChat, type UseChatHelpers } from "@ai-sdk/react";
 import {
   DefaultChatTransport,
+  getToolName,
+  isToolUIPart,
   lastAssistantMessageIsCompleteWithToolCalls,
 } from "ai";
 import { runHighlight } from "./highlight";
@@ -402,6 +404,54 @@ export function useAgentChat(options: UseAgentChatOptions): UseAgentChatReturn {
     [chat.addToolOutput, executeTool],
   );
 
+  /**
+   * Flip the toggle, then settle whatever it just un-gated.
+   *
+   * A `confirm` call parks in `input-available` until something answers it, and
+   * raising the policy mid-turn removes the approval card without removing the
+   * call — so the turn would sit waiting on an answer the UI no longer offers a
+   * way to give. Reading `policiesRef` before the state commit is deliberate: a
+   * call that was gated behind the card is exactly one whose *previous* policy
+   * was `confirm`, which is also what keeps `disabled` disabled here.
+   *
+   * Resolved calls run in transcript order and report plain execution rather
+   * than `approvedByUser`, so a call the toggle catches is indistinguishable
+   * from one that arrived with the toggle already on.
+   */
+  const applyAutoApprove = useCallback(
+    (next: boolean) => {
+      setAutoApprove(next);
+      const helpers = helpersRef.current;
+      if (!next || !helpers) return;
+      const pending = helpers.messages.flatMap((message) =>
+        message.parts.flatMap((part) => {
+          if (!isToolUIPart(part) || part.state !== "input-available") return [];
+          const toolName = getToolName(part);
+          if (
+            !isAgentToolName(toolName) ||
+            policiesRef.current[toolName] !== "confirm"
+          ) {
+            return [];
+          }
+          return [{ toolName, toolCallId: part.toolCallId, input: part.input }];
+        }),
+      );
+      if (pending.length === 0) return;
+      void (async () => {
+        // Sequential: a navigation still has to settle before a later target
+        // resolves against the page it lands on.
+        for (const call of pending) {
+          await helpers.addToolOutput({
+            tool: call.toolName,
+            toolCallId: call.toolCallId,
+            output: await executeTool(call.toolName, call.input),
+          });
+        }
+      })();
+    },
+    [executeTool],
+  );
+
   const stop = useCallback(() => void chat.stop(), [chat.stop]);
 
   const removeQuote = useCallback(
@@ -530,11 +580,12 @@ export function useAgentChat(options: UseAgentChatOptions): UseAgentChatReturn {
       clearQuotes,
       reset,
       autoApprove,
-      setAutoApprove,
+      setAutoApprove: applyAutoApprove,
       respondToToolCall,
       replayActions,
     }),
     [
+      applyAutoApprove,
       chat.messages,
       chat.status,
       chat.error,

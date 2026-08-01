@@ -1,6 +1,6 @@
 # agent-ui
 
-`agent-ui` is a portable, shadcn-style React assistant toolkit that you scaffold
+`agent-ui` is a portable React assistant toolkit that you scaffold
 into your own repository. The included assistant is named Agent and provides
 streaming chat, markdown-based site knowledge, safe page navigation, element
 highlighting, and opt-in button clicking. Your application owns the source,
@@ -32,14 +32,15 @@ starter prompts per page, a hero photo that shows why `highlightOptions` exists,
 and light and dark themes over the same four-color palette. It also demonstrates
 the dock's continuous launcher-to-panel transition, selection context that can
 be queued without opening Agent, and grouped client actions that can be replayed
-locally.
+locally — one at a time or as a whole group.
 
 #### Control panel
 
 Every knob lives in a Tweakpane panel behind the tab on the **left edge**:
 shell variant, appearance, side, launcher, title, header, starter prompts,
 detachable, selection popover, all three tool policies, per-turn caps, highlight
-theming, page, and theme. Click the tab or press `h` to collapse it, which
+theming (including ring width and the pulse), page, and theme. Click the tab or
+press `h` to collapse it, which
 leaves the page looking like an ordinary site for screenshots and recordings.
 
 The panel writes its state to the query string, so any configuration is a
@@ -154,6 +155,10 @@ import { publicManifest } from "./manifest";
 `styles.css` is plain CSS; Tailwind is optional. Tailwind v4 users can also
 import `./agent/tailwind.css` for token-backed utilities.
 
+One import is all you need: `styles.css` pulls in `theme.css` itself. Edit
+`theme.css` for colors, radius, and sizing — that is the file meant to be
+yours, and the one `agent-ui update` leaves alone.
+
 ### 3. Define site knowledge
 
 Until `agent-ui sync` ships, describe your pages in one browser-safe manifest,
@@ -266,6 +271,34 @@ export const POST = createAgentHandler({
 });
 ```
 
+#### React Router v7, TanStack Start, Hono, and other Fetch-standard hosts
+
+The handler takes a `Request` and returns a `Response`, so any framework that
+hands you the raw request can host it. Build the handler once at module scope
+and forward the request from whatever export shape the framework asks for:
+
+```ts
+const handler = createAgentHandler({
+  model: google("gemini-flash-latest"),
+  manifest: serverManifest,
+});
+
+// React Router v7 / Remix resource route (app/routes/api.agent.ts)
+export const action = ({ request }: Route.ActionArgs) => handler(request);
+
+// TanStack Start server route (src/routes/api/agent.ts)
+export const ServerRoute = createServerFileRoute("/api/agent").methods({
+  POST: ({ request }) => handler(request),
+});
+
+// Hono
+app.post("/api/agent", (c) => handler(c.req.raw));
+```
+
+Nothing above is agent-ui API — only the route export differs per framework,
+and the handler is the same object in each. Match the path to the `api` prop
+you pass `AgentChat` (default `/api/agent`).
+
 #### Vite development
 
 Vite SPAs have no server routes, so mount agent-ui as development middleware with
@@ -289,26 +322,46 @@ export const handler = toNodeHandler(
 ```ts
 // vite.config.ts
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 
-export default defineConfig({
-  plugins: [
-    react(),
-    {
-      name: "agent-api",
-      configureServer(server) {
-        server.middlewares.use("/api/agent", async (req, res, next) => {
-          try {
-            const { handler } = await server.ssrLoadModule("/src/agent-api.ts");
-            handler(req, res);
-          } catch (error) {
-            next(error);
-          }
-        });
+export default defineConfig(({ mode }) => {
+  // Vite reads .env into import.meta.env, and only for VITE_-prefixed names.
+  // The adapter runs in this Node process and reads process.env, so bridge the
+  // two yourself or the first request fails with AI_LoadAPIKeyError. The empty
+  // prefix loads unprefixed names too; this stays server-side, so never copy
+  // these into `define` or any client-visible config.
+  Object.assign(process.env, loadEnv(mode, process.cwd(), ""));
+
+  return {
+    plugins: [
+      react(),
+      {
+        name: "agent-api",
+        configureServer(server) {
+          server.middlewares.use("/api/agent", async (req, res, next) => {
+            try {
+              const { handler } = await server.ssrLoadModule("/src/agent-api.ts");
+              handler(req, res);
+            } catch (error) {
+              next(error);
+            }
+          });
+        },
       },
-    },
-  ],
+    ],
+  };
 });
+```
+
+`create vite` with the `react-ts` template pins `"types": ["vite/client"]` in
+`tsconfig.app.json`, and an explicit `types` array suppresses the automatic
+`@types/*` pickup. The scaffolded `server/node.ts` then fails to compile with
+missing `node:http` and `node:stream` types even though `init` added
+`@types/node` correctly. Add `"node"` to that array:
+
+```jsonc
+// tsconfig.app.json
+"types": ["vite/client", "node"]
 ```
 
 This keeps local development on one origin and port. For production, deploy
@@ -319,8 +372,16 @@ not need to manage a separate public port.
 #### The API key
 
 Put it in the server environment only — a plain `.env` (or `.env.local`) at your
-project root, which the adapter reads by itself. You never pass the key to
-`createAgentHandler`.
+project root. You never pass the key to `createAgentHandler`; the adapter reads
+`process.env` itself.
+
+Getting that file *into* `process.env` is the runtime's job, and not every
+runtime does it. Next.js and Bun load `.env` on their own. Plain Node running
+Vite does not: Vite parses `.env` into `import.meta.env`, and only for
+`VITE_`-prefixed names, so an unprefixed key never reaches the adapter and the
+first request fails with `AI_LoadAPIKeyError`. On that path, bridge it with
+`loadEnv` in `vite.config.ts` (see the Vite snippet above) or start the dev
+server with `node --env-file=.env` (Node 20.6+).
 
 ```dotenv
 GOOGLE_GENERATIVE_AI_API_KEY=your_key_here
@@ -382,6 +443,8 @@ Prefer rolling aliases when available because dated model IDs can retire.
 | Panel opens, every message errors | No server route mounted, or the wrong path | Mount `createAgentHandler` and match the `api` prop to it (default `/api/agent`) |
 | `AI_UnsupportedModelVersionError` | Adapter major ahead of `ai@^5` | Install the `^2` adapter, not `latest` |
 | Provider 401/403 in the server log | Key missing, misnamed, or read from a `VITE_`/`NEXT_PUBLIC_` variable | Use the exact variable name from the table above in a server-side `.env`, then restart |
+| `AI_LoadAPIKeyError` on the first request, Vite dev | `.env` never reached `process.env` — Vite loads only `VITE_` names, and only into `import.meta.env` | Bridge it with `loadEnv` in `vite.config.ts` (see the Vite snippet), or run `node --env-file=.env` |
+| `node:http` / `node:stream` types missing in `server/node.ts` | `create vite react-ts` pins `"types": ["vite/client"]`, which turns off automatic `@types/*` pickup | Add `"node"`: `"types": ["vite/client", "node"]` in `tsconfig.app.json` |
 | `{"error":"origin-not-allowed"}` | API served from a different origin than the UI | Pass `allowedOrigins` to `createAgentHandler` |
 | `{"error":"body-too-large"}` / `message-too-long` | Request past a hardening cap | Raise the specific `limits` field (each has a hard ceiling) |
 | "That is not in the site content" for everything | Server manifest has no bodies | Fill in `withContent`; check the route keys match the public manifest exactly |
@@ -408,7 +471,7 @@ Required props are `api`, `currentRoute`, `navigate`, and `manifest`.
 | `selectionAsk` | `true` | Offer Agent for selected page text |
 | `selectionSide` | `"top"` | Which edge of the selection that popup sits on: `"top"`, `"bottom"`, `"left"`, `"right"` |
 | `starterPrompts` | none | `{ label, prompt }` suggestions shown before the first message |
-| `highlightOptions` | built-in theme | Overlay duration, padding, border, fill, ring, and radius |
+| `highlightOptions` | built-in theme | Overlay duration, padding, border, fill, ring, shadow, pulse, and a `className` escape hatch |
 | `toolPolicy` | safe defaults | Per-tool `auto`, `confirm`, or `disabled` |
 
 The dock keeps one bottom-anchored surface mounted while it opens and closes,
@@ -495,6 +558,49 @@ on; it cannot widen which elements the model may reach, and the approval card
 still appears. Widen `isInteractable` only to elements whose activation the user
 can see happen.
 
+### Restyling the highlight
+
+The highlight is a positioned overlay element, and every visual is a custom
+property. Change the look at whichever level fits:
+
+```css
+/* Everywhere, in theme.css — these are the shipped defaults. */
+:root {
+  --agent-highlight-border-color: var(--agent-accent);
+  --agent-highlight-border-width: 2px;
+  --agent-highlight-border-style: solid;
+  --agent-highlight-fill: color-mix(in oklch, var(--agent-accent) 8%, transparent);
+  --agent-highlight-ring-color: color-mix(in oklch, var(--agent-accent) 35%, transparent);
+  --agent-highlight-ring-width: 4px;   /* the resting ring */
+  --agent-highlight-pulse-width: 10px; /* how far the pulse pushes it out */
+  --agent-highlight-pulse-duration: 1.4s;
+  --agent-highlight-radius: var(--agent-radius);
+  --agent-highlight-shadow: 0 0 0 0 transparent;
+}
+```
+
+```tsx
+// Per app, via the prop — each field writes the matching property above.
+<AgentChat
+  highlightOptions={{
+    borderColor: "#f59e0b",
+    borderStyle: "dashed",
+    ringWidth: 6,
+    boxShadow: "0 8px 30px rgb(0 0 0 / 0.25)",
+    pulse: false,      // keep the ring, stop it animating
+    durationMs: 6000,
+    padding: 10,
+  }}
+  /* …required props… */
+/>
+```
+
+For anything the fields do not cover, pass `className` and style
+`.agent-highlight-overlay.your-class` yourself — the overlay is a plain
+element with no inline styling beyond its position and the properties above.
+`--agent-highlight-shadow` is a no-op shadow rather than `none` because it sits
+in a comma-separated `box-shadow` list, where `none` would void the declaration.
+
 ### Ordering: navigate before pointing
 
 `highlight` and `interact` only reach the page the user is on. That constraint is
@@ -532,25 +638,41 @@ dark artwork:
 
 Tool defaults are highlight `auto`, navigate `confirm`, and interact `confirm`.
 The auto-approve control can skip confirmation but never re-enable a disabled
-tool. Colors, radius, surfaces, and glass tint use `--agent-*` CSS tokens with
-separate `.dark` values. Retheming means setting those tokens and nothing else:
+tool. Turning it on while an approval card is already up approves that pending
+call too, rather than leaving the turn parked on a card it just removed.
+
+Colors, radius, surfaces, and glass tint use `--agent-*` CSS tokens with
+separate `.dark` values, all declared in `theme.css`. Retheming means setting
+those tokens and nothing else:
 the panel-header color and the band painted behind it both derive from
 `--agent-primary`, so they follow a brand change automatically. The one pairing
 to keep in step is `--agent-header-height` and the header's own height — the band
 is drawn exactly that tall, so that no panel surface shows at the header's edges.
 Resizing a panel commits whole pixels for the same reason.
 
-Completed page actions are grouped in the transcript. The **Replay actions**
-control re-executes the successful built-in client actions in that group
-directly in the browser, without sending another model or API request. Replay
-is not a shortcut around enforcement: the current policy, exact route/target
-manifest, live DOM, native interaction checks, and fresh capped counters are
-applied again. The explicit Replay click satisfies a `confirm` policy, while a
-`disabled` policy still blocks execution. Replays are capped at eight actions,
-wait for a completed navigation before resolving a later page target, and stop
-at the first failure. They do not add another turn to the transcript. Denied,
-failed, unsupported, server-executed, and future registered actions are not
-replayed.
+Closing the dock or sidebar fades the conversation out before the panel itself
+moves, over `--agent-close-fade-duration` (0.18s). Both shells collapse toward a
+screen edge, so without it the last thing you watch is a wall of text being
+squeezed away. Keep any change to that token under the shell's own exit so the
+fade still finishes first. Reduced-motion users skip the whole exit, fade
+included.
+
+Page actions are grouped in the transcript, one Actions section per response —
+a turn that navigates and then highlights is one section, not one per step.
+Every successful action carries its own replay button on the right of its row,
+and **Replay all actions** at the foot of the section re-runs the whole group in
+order. Both re-execute directly in the browser, without sending another model or
+API request.
+
+Replay is not a shortcut around enforcement: the current policy, exact
+route/target manifest, live DOM, native interaction checks, and fresh capped
+counters are applied again. The explicit Replay click satisfies a `confirm`
+policy, while a `disabled` policy still blocks execution. Replays are capped at
+eight actions, wait for a completed navigation before resolving a later page
+target, and stop at the first failure — a single-action replay is simply a batch
+of one, so it obeys the same rules. They do not add another turn to the
+transcript. Denied, failed, unsupported, server-executed, and future registered
+actions are not replayed.
 
 For custom composition, use `<AgentProvider>` with `AgentDock`, `AgentSidebar`, or
 `AgentSpotlight` and the exported header, body, messages, input, and action
@@ -568,7 +690,7 @@ default glyph. Context hooks cover the rest: `useAgentContext`,
 
 ```bash
 bun run typecheck    # registry, CLI, and playground TypeScript
-bun test             # 195 unit and component-contract tests
+bun test             # 213 unit and component-contract tests
 bun run test:e2e     # 21 Chromium flows; starts Vite automatically
 bun run cli:build    # rebuild CLI output and bundled templates
 ```
@@ -585,6 +707,38 @@ Repository layout:
 | `packages/cli/` | `@tuann72/agent-ui` initializer and bundled templates |
 | `apps/playground/` | Demo site, control panel, mock model, manifests, browser tests |
 | `scripts/dev-real.ts` | Uncommitted real-provider smoke-test launcher |
+
+## Staying updatable
+
+You own the scaffolded source, so an upgrade is a merge, not an install. What
+decides how big that merge is, is which files you had to edit to make Agent
+yours. The layout is arranged so the answer is "almost none":
+
+| Want to change | Edit | Survives an update |
+| --- | --- | --- |
+| Colors, radius, sizing, highlight look | `theme.css` | Yes — we never write here |
+| Which shell, header, launcher, policies, prompts | Props on `AgentChat` | Yes — no file is touched |
+| What the assistant knows | Your manifest, outside `agent/` | Yes |
+| What `interact` does to an element | `core/interact.ts` (three named pieces) | Reconcile if we change that file |
+| Layout, spacing, new rules | Your own stylesheet, after the import | Yes |
+| Anything else in `agent/` | The file itself | Reconcile by hand |
+
+The rule behind the table: **customize through tokens and props, not by editing
+rules.** `styles.css` is where new rules land on every release, so a theme
+written in place would conflict on every upgrade — which is exactly why the
+tokens live in `theme.css` and `styles.css` only `@import`s it. Additional CSS
+of your own belongs in your stylesheet, loaded after `styles.css`, where
+specificity does the work and nothing has to be merged.
+
+`init` records a SHA-256 of every file as it writes it, in `.agent.json`. That
+is what lets the planned `agent-ui update` tell "untouched, safe to replace"
+from "you edited this, here is the diff" per file, instead of asking you to
+diff a whole directory. Keep `.agent.json` in version control.
+
+Until `update` ships, re-running `init --force` re-scaffolds in place. It
+preserves your `.agent.json` provider and never overwrites a dependency range
+you declared, but it *does* overwrite the source files — so commit first, and
+treat your own edits as something to re-apply from the diff.
 
 ## Status
 

@@ -1,50 +1,9 @@
 /*
- * Agent theming tokens. Consumers own this file: swap the primary/accent
- * values to match the site's brand. When a shadcn theme exists, point these
- * at var(--primary) / var(--accent) instead.
+ * Agent structure and rules. `agent-ui update` replaces this file wholesale, so
+ * put customizations in `theme.css` (tokens) or your own stylesheet rather than
+ * editing here — an edit in this file has to be reconciled by hand on update.
  */
-:root {
-  --agent-primary: oklch(0.55 0.2 262);
-  --agent-primary-foreground: oklch(0.985 0.005 262);
-  --agent-accent: oklch(0.72 0.14 190);
-  --agent-accent-foreground: oklch(0.2 0.03 190);
-  --agent-surface: oklch(1 0 0);
-  --agent-surface-foreground: oklch(0.21 0.01 262);
-  --agent-muted-foreground: oklch(0.55 0.01 262);
-  --agent-border: oklch(0.91 0.005 262);
-  --agent-glass: oklch(1 0 0 / 0.4);
-  --agent-glass-sheen: oklch(1 0 0 / 0.35);
-  --agent-danger: oklch(0.5 0.2 25);
-  --agent-danger-border: oklch(0.6 0.2 25);
-  --agent-radius: 0.75rem;
-  /* The standard panel header's minimum height. --agent-panel-band is painted
-     exactly this tall, so the two must move together. */
-  --agent-header-height: 2.75rem;
-  --agent-selection-radius: 0.625rem;
-  --agent-highlight-border-color: var(--agent-accent);
-  --agent-highlight-border-width: 2px;
-  --agent-highlight-border-style: solid;
-  --agent-highlight-fill: color-mix(in oklch, var(--agent-accent) 8%, transparent);
-  --agent-highlight-ring-color: color-mix(in oklch, var(--agent-accent) 35%, transparent);
-  --agent-highlight-radius: var(--agent-radius);
-}
-
-.dark {
-  --agent-primary: oklch(0.68 0.17 262);
-  --agent-primary-foreground: oklch(0.16 0.02 262);
-  --agent-accent: oklch(0.78 0.12 190);
-  --agent-accent-foreground: oklch(0.18 0.03 190);
-  --agent-surface: oklch(0.21 0.01 262);
-  --agent-surface-foreground: oklch(0.93 0.005 262);
-  --agent-muted-foreground: oklch(0.68 0.01 262);
-  --agent-border: oklch(0.32 0.01 262);
-  --agent-glass: oklch(0.22 0.015 262 / 0.5);
-  --agent-glass-sheen: oklch(1 0 0 / 0.08);
-  /* Near-white: the light-mode red is a dark ink that all but disappears
-     against a dark panel, and every variant's panel is dark glass here. */
-  --agent-danger: oklch(0.88 0.06 25);
-  --agent-danger-border: oklch(0.65 0.15 25);
-}
+@import "./theme.css";
 
 /* ---------- shared primitives ---------- */
 
@@ -287,9 +246,9 @@
   gap: 0.25rem;
   max-width: 100%;
   padding: 0.25rem 0.25rem 0.25rem 0.625rem;
-  border: 1px solid color-mix(in oklch, var(--agent-accent) 45%, var(--agent-border));
+  border: 1px solid var(--agent-surface-raised-border);
   border-radius: 999px;
-  background: color-mix(in oklch, var(--agent-accent) 10%, var(--agent-surface));
+  background: var(--agent-surface-raised);
   font-size: 0.8125rem;
   color: var(--agent-muted-foreground);
 }
@@ -300,7 +259,6 @@
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
-  font-style: italic;
 }
 
 .agent-quote-chip-dismiss {
@@ -308,7 +266,7 @@
   flex-shrink: 0;
 }
 .agent-quote-chip-dismiss:hover {
-  background: color-mix(in oklch, var(--agent-accent) 20%, transparent);
+  background: color-mix(in oklch, currentColor 15%, transparent);
 }
 
 /* ---------- panel chrome ---------- */
@@ -481,45 +439,84 @@
 
 .agent-action-group {
   overflow: hidden;
-  border: 1px solid var(--agent-border);
+  border: 1px solid var(--agent-surface-raised-border);
   border-radius: var(--agent-radius);
-  background: color-mix(
-    in oklch,
-    var(--agent-accent) 6%,
-    var(--agent-surface)
-  );
+  background: var(--agent-surface-raised);
 }
 
 .agent-action-group-heading {
   padding: 0.45rem 0.65rem;
-  border-bottom: 1px solid var(--agent-border);
+  border-bottom: 1px solid var(--agent-surface-raised-border);
   color: var(--agent-surface-foreground);
   font-size: 0.75rem;
   font-weight: 650;
 }
 
-.agent-action-group-list,
-.agent-replay-results {
+.agent-action-group-list {
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
   padding: 0.625rem 0.65rem;
 }
 
-.agent-replay-results {
-  border-top: 1px solid var(--agent-border);
-  background: color-mix(
-    in oklch,
-    var(--agent-primary) 4%,
-    transparent
-  );
+.agent-action-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+/* The action and its replay button share a line, with the button pinned right.
+   `min-width: 0` lets a long target ellipsize instead of pushing the button
+   past the panel edge. */
+.agent-action-item-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.agent-action-item-row > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.agent-action-replay {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  border: none;
+  border-radius: 0.375rem;
+  background: transparent;
+  color: var(--agent-muted-foreground);
+  cursor: pointer;
+  /* Visible from the keyboard and on touch, where there is no hover to reveal
+     it; pointer users get the stronger contrast on hover. */
+  opacity: 0.65;
+  transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.agent-action-item-row:hover .agent-action-replay,
+.agent-action-replay:focus-visible {
+  opacity: 1;
+  color: var(--agent-surface-foreground);
+  background: color-mix(in oklch, currentColor 10%, transparent);
+}
+.agent-action-replay:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* A replayed outcome sits under the action it came from, indented to the width
+   of the status icon so the two read as one entry. */
+.agent-replay-result {
+  padding-left: 1.1rem;
+  color: var(--agent-surface-foreground);
 }
 
 .agent-action-group-footer {
   display: flex;
   justify-content: flex-end;
   padding: 0.5rem 0.65rem;
-  border-top: 1px solid var(--agent-border);
+  border-top: 1px solid var(--agent-surface-raised-border);
 }
 
 .agent-replay-button {
@@ -1020,9 +1017,8 @@ body.agent-resizing-move * {
 /*
  * While the sidebar is open, the page is pushed aside via a body margin so
  * content stays fully visible. On small screens the panel is full-width, so
- * no room is made. Consumers can change the width via --agent-sidebar-width.
+ * no room is made. The width itself is --agent-sidebar-width, in theme.css.
  */
-:root { --agent-sidebar-width: 24rem; }
 
 body.agent-sidebar-push {
   transition:
@@ -1325,8 +1321,16 @@ body.agent-sidebar-push-left { margin-left: var(--agent-sidebar-width); }
   border-color: var(--agent-highlight-border-color);
   border-radius: var(--agent-highlight-radius);
   background: var(--agent-highlight-fill);
-  box-shadow: 0 0 0 4px var(--agent-highlight-ring-color);
-  animation: agent-highlight-pulse 1.4s ease-in-out infinite;
+  box-shadow:
+    0 0 0 var(--agent-highlight-ring-width) var(--agent-highlight-ring-color),
+    var(--agent-highlight-shadow);
+  animation: agent-highlight-pulse var(--agent-highlight-pulse-duration)
+    ease-in-out infinite;
+}
+/* Opt out of the pulse and keep the resting ring: `highlightOptions.pulse:
+   false`, or set --agent-highlight-pulse-duration to 0s globally. */
+.agent-highlight-overlay.agent-highlight-static {
+  animation: none;
 }
 
 /* ---------- motion ---------- */
@@ -1347,6 +1351,19 @@ body.agent-sidebar-push-left { margin-left: var(--agent-sidebar-width); }
 .agent-sidebar-panel.agent-side-left { --agent-slide-from: -100%; }
 .agent-sidebar-panel.agent-closing {
   animation: agent-slide-out 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Closing fades the transcript out ahead of the frame. Both shells collapse
+   toward an edge, so without this the last thing the eye tracks is a wall of
+   text being squeezed or dragged off-screen; fading it first leaves a plain
+   surface to animate. `forwards` holds the faded frame until the lifecycle
+   commit unmounts the panel, and the composer goes with it so a keystroke
+   cannot land in an input that is halfway gone. */
+.agent-dock-panel.agent-closing .agent-panel-body,
+.agent-sidebar-panel.agent-closing .agent-panel-body {
+  animation: agent-fade-out var(--agent-close-fade-duration, 0.18s) ease-in
+    forwards;
+  pointer-events: none;
 }
 
 @keyframes agent-dock-actions-in {
@@ -1422,8 +1439,16 @@ body.agent-sidebar-push-left { margin-left: var(--agent-sidebar-width); }
 }
 
 @keyframes agent-highlight-pulse {
-  0%, 100% { box-shadow: 0 0 0 4px var(--agent-highlight-ring-color); }
-  50% { box-shadow: 0 0 0 10px transparent; }
+  0%, 100% {
+    box-shadow:
+      0 0 0 var(--agent-highlight-ring-width) var(--agent-highlight-ring-color),
+      var(--agent-highlight-shadow);
+  }
+  50% {
+    box-shadow:
+      0 0 0 var(--agent-highlight-pulse-width) transparent,
+      var(--agent-highlight-shadow);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

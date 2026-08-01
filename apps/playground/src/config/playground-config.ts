@@ -57,7 +57,9 @@ export interface PlaygroundConfig {
   highlightBorderStyle: HighlightBorderStyle;
   highlightFill: string;
   highlightRingColor: string;
+  highlightRingWidth: number;
   highlightRadius: number;
+  highlightPulse: boolean;
 }
 
 export const DEFAULT_CONFIG: PlaygroundConfig = {
@@ -93,7 +95,9 @@ export const DEFAULT_CONFIG: PlaygroundConfig = {
   highlightBorderStyle: "solid",
   highlightFill: "rgba(154, 136, 115, 0.12)",
   highlightRingColor: "rgba(154, 136, 115, 0.4)",
+  highlightRingWidth: 4,
   highlightRadius: 0,
+  highlightPulse: true,
 };
 
 export const VARIANTS: readonly AgentVariant[] = ["dock", "sidebar", "spotlight"];
@@ -197,7 +201,9 @@ const CODECS: { [K in keyof PlaygroundConfig]: Codec<PlaygroundConfig[K]> } = {
   highlightBorderStyle: oneOf("hlStyle", BORDER_STYLES),
   highlightFill: text("hlFill", 40),
   highlightRingColor: text("hlRing", 40),
+  highlightRingWidth: integer("hlRingWidth", 0, 16),
   highlightRadius: integer("hlRadius", 0, 64),
+  highlightPulse: flag("hlPulse"),
 };
 
 const CONFIG_KEYS = Object.keys(CODECS) as (keyof PlaygroundConfig)[];
@@ -253,6 +259,8 @@ export function toHighlightOptions(
     borderStyle: config.highlightBorderStyle,
     backgroundColor: config.highlightFill,
     ringColor: config.highlightRingColor,
+    ringWidth: config.highlightRingWidth,
     borderRadius: `${config.highlightRadius}px`,
+    pulse: config.highlightPulse,
   };
 }

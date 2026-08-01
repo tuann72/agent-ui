@@ -1,13 +1,13 @@
 {
   "name": "@tuann72/agent-ui",
-  "version": "0.1.0",
-  "description": "Scaffold Agent — a portable, shadcn-style AI assistant for React — into your project. Copies the source into your repo; you own it, no runtime dependency on agent-ui.",
+  "version": "0.2.0",
+  "description": "Scaffold Agent — a portable AI assistant for React — into your project. Copies the source into your repo; you own every file, no runtime dependency on agent-ui.",
   "keywords": [
     "ai",
     "assistant",
     "chat",
     "react",
-    "shadcn",
+    "scaffold",
     "ai-sdk",
     "cli"
   ],

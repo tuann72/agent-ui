@@ -197,7 +197,7 @@ test("interact asks for approval, then clicks the pricing page button", async ({
   await sendMessage(page, "Start a membership signup for me");
 
   await expect(
-    page.getByText("Agent wants to click “start-membership”"),
+    page.getByText("Agent wants to click start-membership"),
   ).toBeVisible();
   // Nothing happened on the page while approval is pending.
   await expect(page.getByText("Signup started")).toHaveCount(0);
@@ -208,7 +208,7 @@ test("interact asks for approval, then clicks the pricing page button", async ({
     "Signup started",
   );
   await expect(
-    page.getByText("You approved clicking “start-membership”"),
+    page.getByText("You approved clicking start-membership"),
   ).toBeVisible();
   await expect(
     page.getByText("Done — your membership signup is started."),
@@ -223,7 +223,7 @@ test("interact resolves the right target on a second page", async ({ page }) => 
   await sendMessage(page, "Sign the waiver for me");
 
   await expect(
-    page.getByText("Agent wants to click “sign-waiver”"),
+    page.getByText("Agent wants to click sign-waiver"),
   ).toBeVisible();
   await page.getByRole("button", { name: "Allow" }).click();
   await expect(page.locator("main").getByRole("status")).toContainText(
@@ -240,11 +240,11 @@ test("denying an interact call leaves the page untouched", async ({ page }) => {
   await sendMessage(page, "Start a membership signup for me");
 
   await expect(
-    page.getByText("Agent wants to click “start-membership”"),
+    page.getByText("Agent wants to click start-membership"),
   ).toBeVisible();
   await page.getByRole("button", { name: "Deny" }).click();
   await expect(
-    page.getByText("You denied clicking “start-membership”"),
+    page.getByText("You denied clicking start-membership"),
   ).toBeVisible();
   await expect(page.getByText("Signup started")).toHaveCount(0);
 });
@@ -275,7 +275,7 @@ test("a highlight on another page navigates there first, then lands", async ({
 
   // The highlight is a second, dependent step, and it resolves against the page
   // that was navigated to — the overlay exists and the target is the real one.
-  await expect(dialog(page).getByText("Highlighted “gear-rentals”")).toBeVisible();
+  await expect(dialog(page).getByText("Highlighted gear-rentals")).toBeVisible();
   await expect(page.locator(".agent-highlight-overlay")).toBeVisible();
   // Overlay geometry, on the horizontal axis only: the vertical one is still
   // settling from the scroll-into-view when this runs.
@@ -402,19 +402,31 @@ test("a multi-action group replays locally without another API request", async (
   await expect(actionGroup.locator(".agent-tool-row")).toHaveCount(2);
   const beforeReplay = agentRequests;
 
-  await actionGroup.getByRole("button", { name: "Replay actions" }).click();
+  // A single action's own button repeats just that action.
+  await actionGroup
+    .getByRole("button", { name: "Replay highlighting gear-rentals" })
+    .click();
   await expect(
-    actionGroup.getByText("Replayed: Highlighted “day-passes”"),
+    actionGroup.getByText("Replayed: Highlighted gear-rentals"),
   ).toBeVisible();
   await expect(
-    actionGroup.getByText("Replayed: Highlighted “gear-rentals”"),
+    actionGroup.getByText("Replayed: Highlighted day-passes"),
+  ).toHaveCount(0);
+  expect(agentRequests).toBe(beforeReplay);
+
+  await actionGroup.getByRole("button", { name: "Replay all actions" }).click();
+  await expect(
+    actionGroup.getByText("Replayed: Highlighted day-passes"),
+  ).toBeVisible();
+  await expect(
+    actionGroup.getByText("Replayed: Highlighted gear-rentals"),
   ).toBeVisible();
   expect(agentRequests).toBe(beforeReplay);
 
   await page
     .locator('[data-agent-target="day-passes"]')
     .evaluate((element) => element.remove());
-  await actionGroup.getByRole("button", { name: "Replay actions" }).click();
+  await actionGroup.getByRole("button", { name: "Replay all actions" }).click();
   await expect(actionGroup.getByText(/target-not-found/)).toBeVisible();
   await expect(
     actionGroup.getByText("Skipped after an earlier action failed"),

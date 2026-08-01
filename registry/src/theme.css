@@ -1,0 +1,86 @@
+/*
+ * Agent theming tokens — the file you own and edit.
+ *
+ * Swap the primary/accent values to match the site's brand, or point them at
+ * tokens the site already defines (`var(--primary)`, `var(--accent)`).
+ *
+ * This is deliberately separate from `styles.css`. Theming means editing tokens,
+ * and `styles.css` is where new rules land on every release — keeping the two
+ * apart means `agent-ui update` can replace the rules wholesale while your
+ * theme is never touched. Anything you add here survives an update; anything you
+ * change in `styles.css` has to be reconciled by hand.
+ */
+
+:root {
+  --agent-primary: oklch(0.55 0.2 262);
+  --agent-primary-foreground: oklch(0.985 0.005 262);
+  --agent-accent: oklch(0.72 0.14 190);
+  --agent-accent-foreground: oklch(0.2 0.03 190);
+  --agent-surface: oklch(1 0 0);
+  --agent-surface-foreground: oklch(0.21 0.01 262);
+  /* Passive containers that sit *on* the surface — the action group, context
+     chips. Mixed from the surface and its own ink, not from --agent-accent: a
+     low-percentage mix of a saturated brand color reads as a wash of that hue
+     (a warm accent turns the panel pink), which is not a decision a theme meant
+     to make. Accent is reserved for what is asking to be noticed. Deriving it
+     also means it needs no `.dark` value and follows any consumer retheme: ink
+     over a light surface darkens toward off-white, ink over a dark surface
+     lightens, so "raised" survives the flip. */
+  --agent-surface-raised: color-mix(
+    in oklch,
+    var(--agent-surface-foreground) 4%,
+    var(--agent-surface)
+  );
+  --agent-surface-raised-border: color-mix(
+    in oklch,
+    var(--agent-surface-foreground) 11%,
+    var(--agent-surface)
+  );
+  --agent-muted-foreground: oklch(0.55 0.01 262);
+  --agent-border: oklch(0.91 0.005 262);
+  --agent-glass: oklch(1 0 0 / 0.4);
+  --agent-glass-sheen: oklch(1 0 0 / 0.35);
+  --agent-danger: oklch(0.5 0.2 25);
+  --agent-danger-border: oklch(0.6 0.2 25);
+  --agent-radius: 0.75rem;
+  /* The standard panel header's minimum height. --agent-panel-band is painted
+     exactly this tall, so the two must move together. */
+  --agent-header-height: 2.75rem;
+  --agent-selection-radius: 0.625rem;
+  /* How far the open sidebar pushes the page aside. */
+  --agent-sidebar-width: 24rem;
+  --agent-highlight-border-color: var(--agent-accent);
+  --agent-highlight-border-width: 2px;
+  --agent-highlight-border-style: solid;
+  --agent-highlight-fill: color-mix(in oklch, var(--agent-accent) 8%, transparent);
+  --agent-highlight-ring-color: color-mix(in oklch, var(--agent-accent) 35%, transparent);
+  --agent-highlight-radius: var(--agent-radius);
+  /* The resting ring, and how far the pulse pushes it out. Set the duration to
+     0s (or pass `pulse: false` in highlightOptions) for a static outline. */
+  --agent-highlight-ring-width: 4px;
+  --agent-highlight-pulse-width: 10px;
+  --agent-highlight-pulse-duration: 1.4s;
+  /* A no-op layer, not `none`: it sits in a comma-separated box-shadow list,
+     where `none` would invalidate the whole declaration. */
+  --agent-highlight-shadow: 0 0 0 0 transparent;
+  /* How long the transcript fades for when a dock or sidebar closes. Keep it
+     under the shell's own exit so the fade finishes first. */
+  --agent-close-fade-duration: 0.18s;
+}
+
+.dark {
+  --agent-primary: oklch(0.68 0.17 262);
+  --agent-primary-foreground: oklch(0.16 0.02 262);
+  --agent-accent: oklch(0.78 0.12 190);
+  --agent-accent-foreground: oklch(0.18 0.03 190);
+  --agent-surface: oklch(0.21 0.01 262);
+  --agent-surface-foreground: oklch(0.93 0.005 262);
+  --agent-muted-foreground: oklch(0.68 0.01 262);
+  --agent-border: oklch(0.32 0.01 262);
+  --agent-glass: oklch(0.22 0.015 262 / 0.5);
+  --agent-glass-sheen: oklch(1 0 0 / 0.08);
+  /* Near-white: the light-mode red is a dark ink that all but disappears
+     against a dark panel, and every variant's panel is dark glass here. */
+  --agent-danger: oklch(0.88 0.06 25);
+  --agent-danger-border: oklch(0.65 0.15 25);
+}

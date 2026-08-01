@@ -20,13 +20,16 @@ import { parseArgs } from "node:util";
 import {
   buildAgentConfig,
   CliError,
+  detectInstalledProvider,
   detectPackageManager,
   installCommand,
   isProviderId,
   mergeDependencies,
   noProviderHint,
+  pickRootLayout,
   PROVIDERS,
   type ProviderId,
+  styleImportSpecifier,
 } from "./lib";
 
 /** Bundled at build time by scripts/bundle-templates.ts, next to dist/. */
@@ -51,18 +54,23 @@ function walkFiles(root: string): string[] {
   return out.sort();
 }
 
-async function chooseProvider(interactive: boolean): Promise<ProviderId | "none"> {
-  if (!interactive) return "none";
+async function chooseProvider(
+  interactive: boolean,
+  installed: ProviderId | undefined,
+): Promise<ProviderId | "none"> {
+  const fallback = installed ?? "none";
+  if (!interactive) return fallback;
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   try {
     const answer = (
       await rl.question(
-        "Add a provider adapter to your dependencies? (openai / anthropic / google / none) [none]: ",
+        `Add a provider adapter to your dependencies? (openai / anthropic / google / none) [${fallback}]: `,
       )
     )
       .trim()
       .toLowerCase();
-    if (answer === "" || answer === "none") return "none";
+    if (answer === "") return fallback;
+    if (answer === "none") return "none";
     if (isProviderId(answer)) return answer;
     throw new CliError(
       `Unknown provider "${answer}" — expected openai, anthropic, google, or none.`,
@@ -116,8 +124,17 @@ export async function runInit(argv: string[], cliVersion: string): Promise<void>
     );
   }
 
+  // Read before the provider question: what the project already declares is the
+  // answer when nobody is there to ask (a re-run under --yes), and the default
+  // offered when somebody is.
+  const rawPkg = readFileSync(pkgPath, "utf8");
+  const pkg = JSON.parse(rawPkg) as Record<string, unknown>;
+  const installed = detectInstalledProvider(pkg);
+
   let provider: ProviderId | "none";
   if (values.provider !== undefined) {
+    // An explicit flag is the user's statement, including `--provider none` at a
+    // project that has an adapter.
     const flag = values.provider.toLowerCase();
     if (flag !== "none" && !isProviderId(flag)) {
       throw new CliError(
@@ -128,6 +145,7 @@ export async function runInit(argv: string[], cliVersion: string): Promise<void>
   } else {
     provider = await chooseProvider(
       Boolean(process.stdin.isTTY) && !values.yes,
+      installed,
     );
   }
 
@@ -157,8 +175,6 @@ export async function runInit(argv: string[], cliVersion: string): Promise<void>
   if (provider !== "none") {
     wanted[PROVIDERS[provider].pkg] = PROVIDERS[provider].range;
   }
-  const rawPkg = readFileSync(pkgPath, "utf8");
-  const pkg = JSON.parse(rawPkg) as Record<string, unknown>;
   const merge = mergeDependencies(pkg, wanted);
   // Type packages land in devDependencies, so a consumer without @types/node
   // can still typecheck the server/node.ts bridge the CLI just wrote.
@@ -191,10 +207,14 @@ export async function runInit(argv: string[], cliVersion: string): Promise<void>
   }
 
   const src = dir.replace(/\/+$/, "");
+  const layout = pickRootLayout((file) => existsSync(join(cwd, file)));
+  const caveat = layout
+    ? ""
+    : "\n     (that path is from the project root — adjust it to the importing file).";
   console.log("\nNext steps:");
   console.log(`  1. ${installCommand(pm)}`);
   console.log(
-    `  2. Import the styles once (e.g. in your root layout): import "./${src}/styles.css"`,
+    `  2. Import the styles once, in ${layout ?? "your root layout"}: import "${styleImportSpecifier(src, layout)}"${caveat}`,
   );
   console.log(
     `  3. Render <AgentChat api="/api/agent" currentRoute={…} navigate={…} manifest={…} /> from ${dir}.`,

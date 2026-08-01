@@ -58,27 +58,32 @@ interface GroupedToolRun {
 
 type GroupedMessageItem = GroupedMessagePart | GroupedToolRun;
 
-/** Preserve transcript order while wrapping each contiguous tool run once. */
+/**
+ * Preserve transcript order, with every tool call in the message collected into
+ * a single run.
+ *
+ * One response gets one Actions section. Grouping only contiguous parts split it
+ * on boundaries the reader never sees — the SDK emits a `step-start` part
+ * between steps, so a turn that navigates and then highlights arrived as two
+ * runs describing one piece of work. The run takes the place of the first tool
+ * call, which is where the reader already expects it.
+ */
 export function groupAgentMessageParts(
   parts: AgentUIMessage["parts"],
 ): GroupedMessageItem[] {
   const grouped: GroupedMessageItem[] = [];
-  let toolRun: AgentToolPart[] = [];
-  const flushTools = () => {
-    if (toolRun.length === 0) return;
-    grouped.push({ kind: "tools", parts: toolRun });
-    toolRun = [];
-  };
+  const toolParts: AgentToolPart[] = [];
 
   parts.forEach((part, index) => {
     if (isToolUIPart<AgentTools>(part)) {
-      toolRun.push(part);
+      // The first tool call reserves the slot; later ones join that same array
+      // in place rather than opening a second section.
+      if (toolParts.length === 0) grouped.push({ kind: "tools", parts: toolParts });
+      toolParts.push(part);
       return;
     }
-    flushTools();
     grouped.push({ kind: "part", part, index });
   });
-  flushTools();
   return grouped;
 }
 
@@ -144,18 +149,20 @@ function toolPhrases(name: AgentToolName, input: unknown) {
       done: `Navigated to ${route}`,
       denied: `You denied navigation to ${route}`,
       failed: `Couldn't navigate to ${route}`,
+      replay: `Replay navigating to ${route}`,
     };
   }
   const target = (input as { target?: string } | undefined)?.target ?? "…";
   const verb = name === "interact" ? "click" : "highlight";
   const capitalized = verb.charAt(0).toUpperCase() + verb.slice(1);
   return {
-    question: `Agent wants to ${verb} “${target}”`,
-    progress: `${capitalized}ing “${target}”`,
-    approved: `You approved ${verb}ing “${target}”`,
-    done: `${capitalized}ed “${target}”`,
-    denied: `You denied ${verb}ing “${target}”`,
-    failed: `Couldn't ${verb} “${target}”`,
+    question: `Agent wants to ${verb} ${target}`,
+    progress: `${capitalized}ing ${target}`,
+    approved: `You approved ${verb}ing ${target}`,
+    done: `${capitalized}ed ${target}`,
+    denied: `You denied ${verb}ing ${target}`,
+    failed: `Couldn't ${verb} ${target}`,
+    replay: `Replay ${verb}ing ${target}`,
   };
 }
 
@@ -277,28 +284,49 @@ function replayResultText(result: AgentReplayResult): string {
   return `Replay stopped: ${phrases.failed} — ${failureDetail(result.output)}`;
 }
 
+/** A replayable action paired with the tool call whose row owns its result. */
+interface ReplayRow {
+  id: string;
+  action: AgentReplayAction;
+}
+
+/** Identifies the whole-group replay, which no `toolCallId` can collide with. */
+const REPLAY_ALL = "\0all";
+
 function AgentActionGroup({ parts }: { parts: AgentToolPart[] }) {
   const { agent } = useAgentContext();
-  const [replaying, setReplaying] = useState(false);
-  const [replayResults, setReplayResults] = useState<
-    readonly AgentReplayResult[]
-  >([]);
+  // Which replay is in flight, by row id — one at a time, since replays share
+  // the page and a per-row spinner has to name the row it belongs to.
+  const [running, setRunning] = useState<string | null>(null);
+  const [results, setResults] = useState<Record<string, AgentReplayResult>>({});
   const terminal = parts.every(
     (part) =>
       part.state !== "input-streaming" && part.state !== "input-available",
   );
-  const actions = parts
-    .map(replayableAction)
-    .filter((action): action is AgentReplayAction => action !== null);
+  const rows: ReplayRow[] = parts.flatMap((part) => {
+    const action = replayableAction(part);
+    return action === null ? [] : [{ id: part.toolCallId, action }];
+  });
+  const actionsById = new Map(rows.map((row) => [row.id, row.action]));
 
-  const replay = async () => {
-    if (replaying || actions.length === 0) return;
-    setReplaying(true);
-    setReplayResults([]);
+  // One path for both buttons: a single row is just a batch of one, so the
+  // ordering, capping, and skip-after-failure rules stay in `replayActions`.
+  const replay = async (token: string, batch: readonly ReplayRow[]) => {
+    if (running !== null || batch.length === 0) return;
+    setRunning(token);
+    setResults({});
     try {
-      setReplayResults(await agent.replayActions(actions));
+      const outcome = await agent.replayActions(batch.map((row) => row.action));
+      setResults(
+        Object.fromEntries(
+          outcome.map((result, index) => [
+            batch[index]?.id ?? `${token}:${index}`,
+            result,
+          ]),
+        ),
+      );
     } finally {
-      setReplaying(false);
+      setRunning(null);
     }
   };
 
@@ -306,33 +334,49 @@ function AgentActionGroup({ parts }: { parts: AgentToolPart[] }) {
     <section className="agent-action-group" aria-label="Agent actions">
       <div className="agent-action-group-heading">Actions</div>
       <div className="agent-action-group-list">
-        {parts.map((part) => (
-          <ToolPartView key={part.toolCallId} part={part} />
-        ))}
-      </div>
-      {replayResults.length > 0 && (
-        <div className="agent-replay-results" aria-live="polite">
-          {replayResults.map((result, index) => (
-            <div
-              className="agent-tool-row"
-              key={`${result.action.toolName}:${index}`}
-            >
-              {result.output.ok ? <CheckIcon /> : <CloseIcon size={12} />}
-              {replayResultText(result)}
+        {parts.map((part) => {
+          const action = actionsById.get(part.toolCallId);
+          const result = results[part.toolCallId];
+          return (
+            <div className="agent-action-item" key={part.toolCallId}>
+              <div className="agent-action-item-row">
+                <ToolPartView part={part} />
+                {terminal && action && (
+                  <button
+                    type="button"
+                    className="agent-action-replay"
+                    aria-label={toolPhrases(action.toolName, action.input).replay}
+                    disabled={running !== null}
+                    onClick={() =>
+                      void replay(part.toolCallId, [
+                        { id: part.toolCallId, action },
+                      ])
+                    }
+                  >
+                    <RefreshIcon size={12} />
+                  </button>
+                )}
+              </div>
+              {result && (
+                <div className="agent-tool-row agent-replay-result">
+                  {result.output.ok ? <CheckIcon /> : <CloseIcon size={12} />}
+                  {replayResultText(result)}
+                </div>
+              )}
             </div>
-          ))}
-        </div>
-      )}
-      {terminal && actions.length > 0 && (
+          );
+        })}
+      </div>
+      {terminal && rows.length > 0 && (
         <div className="agent-action-group-footer">
           <button
             type="button"
             className="agent-btn-ghost agent-replay-button"
-            disabled={replaying}
-            onClick={() => void replay()}
+            disabled={running !== null}
+            onClick={() => void replay(REPLAY_ALL, rows)}
           >
             <RefreshIcon size={12} />
-            {replaying ? "Replaying…" : "Replay actions"}
+            {running === REPLAY_ALL ? "Replaying…" : "Replay all actions"}
           </button>
         </div>
       )}
@@ -517,7 +561,7 @@ export function AgentInput({
               key={quote}
               title={quote}
             >
-              <span className="agent-quote-chip-text">“{quote}”</span>
+              <span className="agent-quote-chip-text">{quote}</span>
               <button
                 type="button"
                 className="agent-icon-btn agent-quote-chip-dismiss"
