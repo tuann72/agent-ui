@@ -193,6 +193,25 @@ describe("mountHint", () => {
       expect(lines).toContain("createAgentHandler");
     }
   });
+
+  test("every hint puts its imports before its statements", () => {
+    // Hoisting means an import after a statement still runs, so this is about
+    // the paste looking like code someone wrote on purpose — and about not
+    // tripping `import/first` in the project it lands in.
+    for (const kind of ["hono", "vite-spa", "unknown"] as const) {
+      const code = mountHint(kind, context()).filter((line) =>
+        /^\s{4}\S/.test(line),
+      );
+      const lastImport = code.findLastIndex((line) =>
+        line.trimStart().startsWith("import "),
+      );
+      const firstStatement = code.findIndex(
+        (line) => !line.trimStart().startsWith("import "),
+      );
+
+      expect(lastImport).toBeLessThan(firstStatement);
+    }
+  });
 });
 
 describe("generated routes are real TypeScript", () => {

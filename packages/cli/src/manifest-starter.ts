@@ -68,12 +68,17 @@ function discoverTanStackRoutes(files: string[]): string[] {
 /**
  * Route ids for a host, or an empty list when it has no convention to read.
  *
- * React Router v7 is deliberately in the empty case: its routes are declared in
- * `routes.ts` as *code*, and guessing at them by globbing `app/routes/` gets
- * flat-route escapes and layout nesting wrong. A starter with a wrong route in
- * it is worse than one with a placeholder, because `withContent` throws on a
- * route the public manifest does not declare — the consumer would be debugging
- * our guess rather than writing their own.
+ * React Router v7 and a Vite SPA are deliberately in the empty case, for one
+ * reason: neither has routes on the filesystem to read. React Router declares
+ * them in `routes.ts` as *code*, and globbing `app/routes/` instead gets
+ * flat-route escapes and layout nesting wrong. A Vite SPA has no router at all
+ * until the consumer picks one, so there is not even a directory to glob.
+ *
+ * A starter with a wrong route in it is worse than one with a placeholder,
+ * because `withContent` throws on a route the public manifest does not declare
+ * — the consumer would be debugging our guess rather than writing their own.
+ * The placeholder is honest about being unfinished; a plausible wrong guess is
+ * the kind of thing that survives review.
  */
 export function discoverRoutes(kind: HostKind, files: string[]): string[] {
   const found =

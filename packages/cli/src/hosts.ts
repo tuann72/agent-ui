@@ -267,10 +267,15 @@ export function mountHint(
   // files carry. A snippet that referenced a bare `manifest` would be one the
   // reader has to finish before it compiles, which is the gap this whole phase
   // exists to close.
-  const preamble = [
+  //
+  // `extra` exists so a host needing a fourth import gets it grouped with the
+  // other three. Appending it after the `withContent` line still runs — imports
+  // hoist — but it reads as a mangled paste and trips `import/first`.
+  const preamble = (...extra: string[]) => [
     `    import { createAgentHandler, withContent } from "${server}";`,
     `    import { model } from "${model}";`,
     `    import { publicManifest } from "${manifest}";`,
+    ...extra,
     "",
     "    const manifest = withContent(publicManifest, {});",
   ];
@@ -279,7 +284,7 @@ export function mountHint(
     return [
       "  Mount the handler on your Hono app:",
       "",
-      ...preamble,
+      ...preamble(),
       "    const handler = createAgentHandler({ model, manifest });",
       "",
       '    app.post("/api/agent", (c) => handler(c.req.raw));',
@@ -291,8 +296,7 @@ export function mountHint(
       "  A Vite SPA has no server route, so the handler runs as dev-server",
       "  middleware through the bundled Node bridge. Add to vite.config.ts:",
       "",
-      ...preamble,
-      `    import { toNodeHandler } from "${server}/node";`,
+      ...preamble(`    import { toNodeHandler } from "${server}/node";`),
       "",
       "    const agent = toNodeHandler(createAgentHandler({ model, manifest }));",
       "",
@@ -313,7 +317,7 @@ export function mountHint(
     "  is a Fetch-standard (Request) => Response, so mount it wherever your",
     "  server accepts one, at POST /api/agent:",
     "",
-    ...preamble,
+    ...preamble(),
     "    const handler = createAgentHandler({ model, manifest });",
   ];
 }

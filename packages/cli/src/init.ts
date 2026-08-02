@@ -37,6 +37,7 @@ import {
   needsNodeTypes,
   pickViteConfig,
   providerSetupHint,
+  readAgentPaths,
   reactVersionWarning,
   styleImportSpecifier,
   TSCONFIG_FILES,
@@ -179,11 +180,6 @@ export async function runInit(argv: string[], cliVersion: string): Promise<void>
   }
   const fileCount = Object.keys(hashes).length;
 
-  writeFileSync(
-    configPath,
-    JSON.stringify(buildAgentConfig(cliVersion, dir, hashes), null, 2) + "\n",
-  );
-
   // Template dependency ranges come from the bundled manifest (generated from
   // registry/package.json at build time, so they cannot drift).
   const manifest = JSON.parse(
@@ -221,17 +217,25 @@ export async function runInit(argv: string[], cliVersion: string): Promise<void>
     tsconfig !== undefined &&
     needsNodeTypes(readFileSync(join(cwd, tsconfig), "utf8"));
 
+  // Where the last run put these files, if there was one. Only reachable under
+  // `--force` — without it an existing .agent.json has already aborted above.
+  // A file the consumer moved is still their file, so a re-run has to look
+  // where it went rather than write a second copy at today's default.
+  const previous = readAgentPaths(
+    existsSync(configPath) ? readFileSync(configPath, "utf8") : undefined,
+  );
+
   // The model seam. Written once and never again: it is the consumer's file to
   // edit, so an existing one is always kept, `--force` included.
-  const modelPath = agentModelPath(src);
+  const modelPath = previous.model ?? agentModelPath(src);
   const modelExisted = exists(modelPath);
   if (!modelExisted) {
     mkdirSync(dirname(join(cwd, modelPath)), { recursive: true });
     writeFileSync(join(cwd, modelPath), agentModelStub(pm));
   }
 
-  const manifestStarterPath = agentManifestPath(src);
-  const routePath = routeFilePath(host);
+  const manifestStarterPath = previous.manifest ?? agentManifestPath(src);
+  const routePath = previous.route ?? routeFilePath(host);
   const routeContext: RouteTemplateContext = {
     dir: src,
     modelPath,
@@ -285,6 +289,23 @@ export async function runInit(argv: string[], cliVersion: string): Promise<void>
   } finally {
     prompter.close();
   }
+
+  // Written last, because it records where the three files above went — and a
+  // path the consumer declined is still where a later run should look, so the
+  // decision is recorded whether or not a file was written this time.
+  writeFileSync(
+    configPath,
+    JSON.stringify(
+      buildAgentConfig(
+        cliVersion,
+        dir,
+        { model: modelPath, manifest: manifestStarterPath, route: routePath },
+        hashes,
+      ),
+      null,
+      2,
+    ) + "\n",
+  );
 
   console.log(
     modelExisted

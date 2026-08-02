@@ -104,8 +104,9 @@ Run without `--yes` and it asks before writing the route and the manifest. With
 `init` does not pick a provider, install an adapter, or generate provider code.
 `createAgentHandler` takes a `LanguageModel`; which one it is is your decision,
 and it lives in the `agent-model.ts` stub above. Until you edit it, it throws an
-error naming itself — an unconfigured install fails at startup with something
-actionable rather than deep inside the SDK on a first message.
+error naming itself on the first request — an unconfigured install fails with
+something actionable rather than deep inside the SDK. Importing the stub is
+safe, so an unconfigured install never breaks your build.
 
 `init` prints the pinned install command for each of the three common adapters,
 and the stub repeats them in its header. **Use those ranges.** The templates run

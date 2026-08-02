@@ -4,7 +4,7 @@
   "title": "Agent UI configuration",
   "description": "Written to .agent.json by `agent-ui init`. Records where the vendored agent-ui source lives and the install-time hash of every scaffolded file.",
   "type": "object",
-  "required": ["cli", "dir", "content", "files"],
+  "required": ["cli", "dir", "files"],
   "additionalProperties": false,
   "properties": {
     "$schema": {
@@ -22,8 +22,30 @@
     },
     "content": {
       "type": "string",
-      "description": "Markdown content directory for site knowledge, relative to the project root.",
-      "default": "content/agent"
+      "description": "Deprecated and no longer written. Kept so `.agent.json` files from earlier CLI versions still validate; nothing reads it.",
+      "deprecated": true
+    },
+    "paths": {
+      "type": "object",
+      "description": "Where the files init writes beside `dir` live. A re-run reuses these, so a file you moved is found rather than duplicated at the default path.",
+      "additionalProperties": false,
+      "required": ["model", "manifest"],
+      "properties": {
+        "model": {
+          "type": "string",
+          "description": "The model seam, relative to the project root.",
+          "default": "src/agent-model.ts"
+        },
+        "manifest": {
+          "type": "string",
+          "description": "The public site manifest, relative to the project root.",
+          "default": "src/agent-manifest.ts"
+        },
+        "route": {
+          "type": "string",
+          "description": "The generated API route. Absent on hosts init only prints a snippet for."
+        }
+      }
     },
     "files": {
       "type": "object",

@@ -40,7 +40,7 @@ takes every default, leaving CI unchanged.
 
 **1. Export a model.** Pin the adapter to `^2`: the templates run `ai@^5`, and
 `latest` pulls a newer `ai` major that throws `AI_UnsupportedModelVersionError`.
-Until edited, the stub throws at startup naming itself.
+Until edited, the stub throws on the first request, naming itself.
 
 ```ts
 // src/agent-model.ts — server-only. npm install "@ai-sdk/google@^2"

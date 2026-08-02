@@ -29,6 +29,17 @@ newest templates rather than a cached CLI.
   the model stub repeats it. Installing at `latest` still pulls an `ai` major
   the templates cannot run.
 
+- **`content` from `.agent.json`.** It defaulted to `content/agent`, was
+  `required` by the published schema, and was read by nothing — a required field
+  naming a directory no code creates, for an `agent-ui sync` that has not
+  shipped. The documented flow puts page markdown inline in the `withContent`
+  call in your route, which is the opposite convention.
+
+  The property stays in the schema, marked `deprecated`, because
+  `additionalProperties` is `false`: removing it outright would make every
+  `.agent.json` an older CLI wrote fail validation in your editor. New installs
+  no longer write it, and you can delete the line from an existing one.
+
 ### Added
 
 - **`init` detects your framework and writes the wiring.** It finds the root
@@ -62,10 +73,22 @@ newest templates rather than a cached CLI.
 
   Descriptions are left empty and `targets` bare, on purpose. Neither is
   discoverable, and a plausible-looking wrong description is the kind of thing
-  that survives review. React Router discovers nothing at all: its routes are
-  declared in `routes.ts` as code, and `withContent` throws on a route the
+  that survives review. React Router and Vite SPAs discover nothing at all, for
+  the same reason: React Router declares its routes in `routes.ts` as code, and
+  a Vite SPA has no router until you pick one, so neither has routes on disk to
+  read. Both get the one-entry placeholder. `withContent` throws on a route the
   public manifest does not declare, so a wrong guess would be a failed first
   request rather than a cosmetic error.
+
+- **`.agent.json` records where your three files went**, under `paths`. "Never
+  overwritten" was only ever true at the path `init` would pick today: move your
+  manifest to `src/lib/agent-manifest.ts`, re-run under `--force`, and it found
+  nothing at `src/agent-manifest.ts` and wrote a second starter there — a stray
+  file beside the real one, and the same hole for the model stub and the route.
+  A re-run now looks where the files actually are.
+
+  A `.agent.json` that is missing, damaged, or written by an older CLI simply
+  contributes nothing, and `init` falls back to the defaults it has always used.
 
 - **`init` asks before writing** the route and the manifest starter. Every
   question has a default, and `--yes` or a non-TTY stdin takes it without
@@ -102,8 +125,12 @@ newest templates rather than a cached CLI.
   already draw. An existing one is never overwritten, `--force` included.
 
   Until edited it throws an error naming itself, so an unconfigured install
-  fails at startup with something actionable instead of an SDK-internal error on
-  someone's first message.
+  fails with something actionable instead of an SDK-internal error on someone's
+  first message. The throw is deferred to first use rather than run at import:
+  a Vite SPA mounts the handler in `vite.config.ts`, which Vite evaluates before
+  every command it has, so a top-level throw failed `vite dev` and `vite build`
+  outright — scaffolding on Friday and picking a model on Monday looked like
+  agent-ui breaking the project.
 
 - `init` warns about the three things that break *after* it exits successfully,
   with the fix printed inline rather than linked:

@@ -20,6 +20,7 @@ import {
   pickViteConfig,
   PROVIDERS,
   providerSetupHint,
+  readAgentPaths,
   reactVersionWarning,
   styleImportSpecifier,
   viteEnvHint,
@@ -270,6 +271,25 @@ describe("agentModelStub", () => {
     expect(stub).toContain("throw new Error");
   });
 
+  test("importing an unconfigured stub does not throw; using it does", () => {
+    // The regression this guards is a build, not a request. A Vite SPA mounts
+    // the handler in `vite.config.ts`, so a throw at module scope took out
+    // `vite dev` and `vite build` on a project whose only sin was not having
+    // picked a model yet. Evaluate the stub the way a bundler would.
+    const js = new Bun.Transpiler({ loader: "ts" })
+      .transformSync(agentModelStub("npm"))
+      .replace("export const model", "const model");
+
+    // Running the body at all is half the assertion: a stub that threw at module
+    // scope would fail here, before anything touches the model.
+    const model = new Function(`${js}\nreturn model;`)() as Record<
+      string,
+      unknown
+    >;
+
+    expect(() => model.specificationVersion).toThrow("no model configured yet");
+  });
+
   test("carries the pinned install command for every adapter", () => {
     const stub = agentModelStub("pnpm");
     for (const info of Object.values(PROVIDERS)) {
@@ -448,22 +468,50 @@ describe("styleImportSpecifier", () => {
 });
 
 describe("buildAgentConfig", () => {
+  const paths = {
+    model: "src/agent-model.ts",
+    manifest: "src/agent-manifest.ts",
+    route: "app/api/agent/route.ts",
+  };
+
   test("records version, paths, and hashes", () => {
-    const config = buildAgentConfig("0.1.0", "src/agent", {
+    const config = buildAgentConfig("0.1.0", "src/agent", paths, {
       "index.ts": "abc123",
     });
     expect(config).toEqual({
       $schema: AGENT_CONFIG_SCHEMA_URL,
       cli: "0.1.0",
       dir: "src/agent",
-      content: "content/agent",
+      paths,
       files: { "index.ts": "abc123" },
     });
   });
 
+  test("omits the route on a host that only gets a printed snippet", () => {
+    const config = buildAgentConfig(
+      "0.1.0",
+      "src/agent",
+      { model: paths.model, manifest: paths.manifest },
+      {},
+    );
+    expect(config.paths).toEqual({
+      model: paths.model,
+      manifest: paths.manifest,
+    });
+    expect("route" in config.paths).toBe(false);
+  });
+
   test("no provider is recorded — the model is the consumer's, not init's", () => {
-    const config = buildAgentConfig("0.1.0", "src/agent", {});
+    const config = buildAgentConfig("0.1.0", "src/agent", paths, {});
     expect(config).not.toHaveProperty("provider");
+  });
+
+  test("no content directory is recorded — nothing ships that reads one", () => {
+    // It was required by the schema and written by every install, for an
+    // `agent-ui sync` that does not exist and a convention the docs contradict:
+    // page markdown goes inline in `withContent`, in the route.
+    const config = buildAgentConfig("0.1.0", "src/agent", paths, {});
+    expect(config).not.toHaveProperty("content");
   });
 
   test("the published schema stays in step with what init writes", () => {
@@ -472,9 +520,9 @@ describe("buildAgentConfig", () => {
     ) as {
       $id: string;
       required: string[];
-      properties: Record<string, { enum?: string[] }>;
+      properties: Record<string, { deprecated?: boolean }>;
     };
-    const config = buildAgentConfig("0.1.0", "src/agent", {});
+    const config = buildAgentConfig("0.1.0", "src/agent", paths, {});
     expect(schema.$id).toBe(AGENT_CONFIG_SCHEMA_URL);
     expect(config.$schema).toBe(AGENT_CONFIG_SCHEMA_URL);
     for (const key of Object.keys(config)) {
@@ -484,9 +532,50 @@ describe("buildAgentConfig", () => {
       expect(Object.keys(config)).toContain(key);
     }
     // `additionalProperties: false` means a leftover property here would make
-    // every file init writes invalid against its own published schema.
-    expect(Object.keys(schema.properties).toSorted()).toEqual(
-      Object.keys(config).toSorted(),
+    // every file init writes invalid against its own published schema — and
+    // dropping one outright would invalidate every file an older CLI wrote, so
+    // a retired key stays as `deprecated` rather than disappearing.
+    const live = Object.entries(schema.properties)
+      .filter(([, value]) => value.deprecated !== true)
+      .map(([key]) => key);
+    expect(live.toSorted()).toEqual(Object.keys(config).toSorted());
+    expect(Object.keys(schema.properties)).toContain("content");
+  });
+});
+
+describe("readAgentPaths", () => {
+  test("reads back what buildAgentConfig wrote", () => {
+    const config = buildAgentConfig(
+      "0.1.0",
+      "src/agent",
+      {
+        model: "src/lib/model.ts",
+        manifest: "src/lib/manifest.ts",
+        route: "app/routes/api.agent.ts",
+      },
+      {},
     );
+    expect(readAgentPaths(JSON.stringify(config))).toEqual({
+      model: "src/lib/model.ts",
+      manifest: "src/lib/manifest.ts",
+      route: "app/routes/api.agent.ts",
+    });
+  });
+
+  test("a missing, damaged, or older config falls back to the defaults", () => {
+    // Each of these means "init has nothing to reuse", which is what a first
+    // install is. Refusing to run over a damaged JSON file would be worse than
+    // writing to the standard location.
+    expect(readAgentPaths(undefined)).toEqual({});
+    expect(readAgentPaths("{ not json")).toEqual({});
+    expect(readAgentPaths("null")).toEqual({});
+    expect(readAgentPaths('{"dir":"src/agent"}')).toEqual({});
+    expect(readAgentPaths('{"paths":"src"}')).toEqual({});
+  });
+
+  test("a partial or wrongly typed paths object contributes only its good keys", () => {
+    expect(
+      readAgentPaths('{"paths":{"model":"m.ts","manifest":42,"route":""}}'),
+    ).toEqual({ model: "m.ts" });
   });
 });

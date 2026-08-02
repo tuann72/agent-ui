@@ -296,5 +296,5 @@ code to strip them out again. `withContent` emits a document for every public
 route, so the model's catalog and the client's allowlist cover the same pages.
 
 Only the *authoring* half is planned: content under `content/agent`, front matter
-requiring unique `title`/`description`/`route`, and `agent-ui sync` generating the
-manifest. Vector retrieval is out of V1.
+requiring unique `title`/`description`/`route`, `agent-ui sync` generating the
+manifest, and the `.agent.json` field naming it. Vector retrieval is out of V1.

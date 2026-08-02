@@ -259,6 +259,14 @@ export function agentManifestPath(dir: string): string {
  * unconfigured install; only one says why. The alternative surfaces as an
  * SDK-internal error on the first message, several layers from the file that
  * needs the edit.
+ *
+ * The throw is deferred to first property access rather than run at module
+ * scope. A Vite SPA mounts the handler in `vite.config.ts`, which Vite evaluates
+ * before every command it has — so a top-level throw here failed `vite dev` and
+ * `vite build` outright, and an install left unconfigured over a weekend looked
+ * like agent-ui had broken the project rather than like a step still to do. The
+ * error is unchanged and still names this file; only its timing moved, to the
+ * first request that actually reaches for the model.
  */
 export function agentModelStub(pm: PackageManager): string {
   const options = providerInstallLines(pm)
@@ -290,11 +298,16 @@ ${options}
  */
 export const model: LanguageModel = notConfigured();
 
+// Throws when something first reaches for the model, not when this module is
+// evaluated — importing an unconfigured stub must not break your build.
 function notConfigured(): LanguageModel {
-  throw new Error(
-    "agent-ui: no model configured yet — edit agent-model.ts and export one. " +
-      "See the comment at the top of that file.",
-  );
+  const fail = (): never => {
+    throw new Error(
+      "agent-ui: no model configured yet — edit agent-model.ts and export one. " +
+        "See the comment at the top of that file.",
+    );
+  };
+  return new Proxy({} as object, { get: fail, has: fail }) as LanguageModel;
 }
 `;
 }
@@ -444,14 +457,33 @@ export function withoutExtension(path: string): string {
 export const AGENT_CONFIG_SCHEMA_URL =
   "https://raw.githubusercontent.com/tuann72/agent-ui/main/packages/cli/schema.json";
 
+/**
+ * Where the three consumer-owned files ended up.
+ *
+ * "Never overwritten" was only ever true at the path init would pick today: move
+ * your manifest to `src/lib/agent-manifest.ts` and a `--force` re-run found
+ * nothing at `src/agent-manifest.ts`, so it wrote a second starter there — a
+ * stray file next to the real one, and the same hole for the model stub and the
+ * route. Recording the paths is what lets a re-run look where the files
+ * actually are.
+ */
+export interface AgentPaths {
+  /** The model seam, relative to the project root. */
+  model: string;
+  /** The public manifest, relative to the project root. */
+  manifest: string;
+  /** The generated API route, absent on hosts init only prints a snippet for. */
+  route?: string;
+}
+
 export interface AgentConfig {
   $schema: string;
   /** CLI version that scaffolded this install. */
   cli: string;
   /** Where the vendored agent-ui source lives, relative to the project root. */
   dir: string;
-  /** Markdown content directory for `agent-ui sync` (invariant 11 default). */
-  content: string;
+  /** Where the files init writes beside `dir` live. */
+  paths: AgentPaths;
   /** Install-time sha256 per template file, for the future `agent-ui update`. */
   files: Record<string, string>;
 }
@@ -459,13 +491,52 @@ export interface AgentConfig {
 export function buildAgentConfig(
   cliVersion: string,
   dir: string,
+  paths: AgentPaths,
   files: Record<string, string>,
 ): AgentConfig {
   return {
     $schema: AGENT_CONFIG_SCHEMA_URL,
     cli: cliVersion,
     dir,
-    content: "content/agent",
+    paths: {
+      model: paths.model,
+      manifest: paths.manifest,
+      ...(paths.route === undefined ? {} : { route: paths.route }),
+    },
     files,
+  };
+}
+
+/**
+ * The paths a re-run should reuse, from a `.agent.json` that may be absent,
+ * malformed, or written by an older CLI that recorded none of this.
+ *
+ * Every field is optional and every failure is silent: a config we cannot read
+ * means init falls back to the defaults it has always used, which is exactly
+ * what a first install does. Refusing to run because a JSON file is damaged
+ * would be a worse outcome than writing to the standard location.
+ */
+export function readAgentPaths(raw: string | undefined): Partial<AgentPaths> {
+  if (raw === undefined) return {};
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return {};
+  }
+  const paths = (parsed as { paths?: unknown } | null)?.paths;
+  if (typeof paths !== "object" || paths === null) return {};
+
+  const pick = (key: keyof AgentPaths): string | undefined => {
+    const value = (paths as Record<string, unknown>)[key];
+    return typeof value === "string" && value.length > 0 ? value : undefined;
+  };
+  const model = pick("model");
+  const manifest = pick("manifest");
+  const route = pick("route");
+  return {
+    ...(model === undefined ? {} : { model }),
+    ...(manifest === undefined ? {} : { manifest }),
+    ...(route === undefined ? {} : { route }),
   };
 }
