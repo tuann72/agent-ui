@@ -14,23 +14,20 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
-import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import {
+  agentModelPath,
+  agentModelStub,
   buildAgentConfig,
   CliError,
-  detectInstalledProvider,
   detectPackageManager,
   installCommand,
-  isProviderId,
   mergeDependencies,
   needsNodeTypes,
-  noProviderHint,
   pickRootLayout,
   pickViteConfig,
-  PROVIDERS,
-  type ProviderId,
+  providerSetupHint,
   reactVersionWarning,
   styleImportSpecifier,
   TSCONFIG_FILES,
@@ -59,38 +56,11 @@ function walkFiles(root: string): string[] {
   return out.sort();
 }
 
-async function chooseProvider(
-  interactive: boolean,
-  installed: ProviderId | undefined,
-): Promise<ProviderId | "none"> {
-  const fallback = installed ?? "none";
-  if (!interactive) return fallback;
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  try {
-    const answer = (
-      await rl.question(
-        `Add a provider adapter to your dependencies? (openai / anthropic / google / none) [${fallback}]: `,
-      )
-    )
-      .trim()
-      .toLowerCase();
-    if (answer === "") return fallback;
-    if (answer === "none") return "none";
-    if (isProviderId(answer)) return answer;
-    throw new CliError(
-      `Unknown provider "${answer}" — expected openai, anthropic, google, or none.`,
-    );
-  } finally {
-    rl.close();
-  }
-}
-
 export async function runInit(argv: string[], cliVersion: string): Promise<void> {
   const { values } = parseArgs({
     args: argv,
     options: {
       dir: { type: "string", default: "src/agent" },
-      provider: { type: "string" },
       yes: { type: "boolean", short: "y", default: false },
       force: { type: "boolean", default: false },
     },
@@ -129,30 +99,8 @@ export async function runInit(argv: string[], cliVersion: string): Promise<void>
     );
   }
 
-  // Read before the provider question: what the project already declares is the
-  // answer when nobody is there to ask (a re-run under --yes), and the default
-  // offered when somebody is.
   const rawPkg = readFileSync(pkgPath, "utf8");
   const pkg = JSON.parse(rawPkg) as Record<string, unknown>;
-  const installed = detectInstalledProvider(pkg);
-
-  let provider: ProviderId | "none";
-  if (values.provider !== undefined) {
-    // An explicit flag is the user's statement, including `--provider none` at a
-    // project that has an adapter.
-    const flag = values.provider.toLowerCase();
-    if (flag !== "none" && !isProviderId(flag)) {
-      throw new CliError(
-        `Unknown provider "${values.provider}" — expected openai, anthropic, google, or none.`,
-      );
-    }
-    provider = flag as ProviderId | "none";
-  } else {
-    provider = await chooseProvider(
-      Boolean(process.stdin.isTTY) && !values.yes,
-      installed,
-    );
-  }
 
   // Copy templates and record install-time hashes for the future `agent-ui update`.
   const hashes: Record<string, string> = {};
@@ -167,8 +115,7 @@ export async function runInit(argv: string[], cliVersion: string): Promise<void>
 
   writeFileSync(
     configPath,
-    JSON.stringify(buildAgentConfig(cliVersion, dir, provider, hashes), null, 2) +
-      "\n",
+    JSON.stringify(buildAgentConfig(cliVersion, dir, hashes), null, 2) + "\n",
   );
 
   // Template dependency ranges come from the bundled manifest (generated from
@@ -176,11 +123,9 @@ export async function runInit(argv: string[], cliVersion: string): Promise<void>
   const manifest = JSON.parse(
     readFileSync(manifestPath, "utf8"),
   ) as TemplateManifest;
-  const wanted = { ...manifest.dependencies };
-  if (provider !== "none") {
-    wanted[PROVIDERS[provider].pkg] = PROVIDERS[provider].range;
-  }
-  const merge = mergeDependencies(pkg, wanted);
+  // No provider adapter: `createAgentHandler` takes a `LanguageModel`, and which
+  // one that is stays the consumer's decision, made in the model stub below.
+  const merge = mergeDependencies(pkg, { ...manifest.dependencies });
   // Type packages land in devDependencies, so a consumer without @types/node
   // can still typecheck the server/node.ts bridge the CLI just wrote.
   const devMerge = mergeDependencies(
@@ -209,8 +154,22 @@ export async function runInit(argv: string[], cliVersion: string): Promise<void>
     tsconfig !== undefined &&
     needsNodeTypes(readFileSync(join(cwd, tsconfig), "utf8"));
 
+  // The model seam. Written once and never again: it is the consumer's file to
+  // edit, so an existing one is always kept, `--force` included.
+  const modelPath = agentModelPath(src);
+  const modelExisted = exists(modelPath);
+  if (!modelExisted) {
+    mkdirSync(dirname(join(cwd, modelPath)), { recursive: true });
+    writeFileSync(join(cwd, modelPath), agentModelStub(pm));
+  }
+
   console.log(`\nAgent scaffolded into ${dir} (${fileCount} files).`);
-  console.log("Wrote .agent.json (paths, provider, install-time file hashes).");
+  console.log(
+    modelExisted
+      ? `Kept your existing ${modelPath}.`
+      : `Wrote ${modelPath} — export your model there (it throws until you do).`,
+  );
+  console.log("Wrote .agent.json (paths, install-time file hashes).");
   const addedNames = Object.keys(added);
   if (addedNames.length > 0) {
     console.log(`Added to package.json: ${addedNames.join(", ")}.`);
@@ -257,31 +216,18 @@ export async function runInit(argv: string[], cliVersion: string): Promise<void>
     "     Skipping this is why an assistant answers \"that is not in the site content\".",
   );
   console.log(
-    `  5. Mount createAgentHandler (from ${src}/server) on POST /api/agent.`,
+    `  5. Mount createAgentHandler (from ${src}/server) on POST /api/agent, passing`,
   );
-  if (provider !== "none") {
-    const info = PROVIDERS[provider];
-    console.log(
-      `     Wire the model there: import { ${info.importName} } from "${info.pkg}" and pass`,
-    );
-    console.log(
-      `     model: ${info.importName}("${info.defaultModel}") to createAgentHandler.`,
-    );
-    console.log(
-      `  6. Put ${info.env}=... in a server-side .env at your project root, then restart.`,
-    );
-    console.log(
-      "     Never prefix it VITE_ or NEXT_PUBLIC_ — those publish the value to the browser.",
-    );
-    // Printed rather than linked: the failure it prevents lands one step after
-    // the .env step above, which is too late to go looking for a README.
-    if (viteConfig !== undefined) {
-      console.log("");
-      for (const line of viteEnvHint(viteConfig)) console.log(line);
-    }
-  } else {
+  console.log(`     the model you export from ${modelPath}.`);
+
+  // Printed rather than linked: an adapter installed at `latest`, or a key Vite
+  // never puts in process.env, both fail on the first message — too late to go
+  // looking for a README.
+  console.log("");
+  for (const line of providerSetupHint(pm)) console.log(line);
+  if (viteConfig !== undefined) {
     console.log("");
-    for (const line of noProviderHint(pm)) console.log(line);
+    for (const line of viteEnvHint(viteConfig)) console.log(line);
   }
   console.log(
     "\nDocs, manifest format, context-authoring guidance, and server-mounting examples\n(Next.js, Vite): https://github.com/tuann72/agent-ui#readme\n",

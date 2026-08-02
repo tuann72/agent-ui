@@ -3,19 +3,19 @@ import { readFileSync } from "node:fs";
 import {
   addCommand,
   AGENT_CONFIG_SCHEMA_URL,
+  agentModelPath,
+  agentModelStub,
   buildAgentConfig,
-  detectInstalledProvider,
   detectPackageManager,
   installCommand,
-  isProviderId,
   isTemplateFile,
   mergeDependencies,
   MIN_REACT_MAJOR,
   needsNodeTypes,
-  noProviderHint,
   pickRootLayout,
   pickViteConfig,
   PROVIDERS,
+  providerSetupHint,
   reactVersionWarning,
   ROOT_LAYOUT_FILES,
   styleImportSpecifier,
@@ -135,22 +135,18 @@ describe("detectPackageManager", () => {
 });
 
 describe("providers", () => {
-  test("ids validate and carry adapter + env metadata", () => {
-    expect(isProviderId("openai")).toBe(true);
-    expect(isProviderId("anthropic")).toBe(true);
-    expect(isProviderId("google")).toBe(true);
-    expect(isProviderId("none")).toBe(false);
-    expect(isProviderId("mistral")).toBe(false);
+  test("every entry carries adapter, range, and env metadata", () => {
     for (const info of Object.values(PROVIDERS)) {
       expect(info.pkg).toStartWith("@ai-sdk/");
+      expect(info.range).toBe("^2");
       expect(info.env.length).toBeGreaterThan(0);
       expect(info.importName.length).toBeGreaterThan(0);
-      expect(info.defaultModel.length).toBeGreaterThan(0);
+      expect(info.exampleModel.length).toBeGreaterThan(0);
     }
   });
 
-  test("no-provider hint lists every adapter with its pinned range", () => {
-    const hint = noProviderHint("npm").join("\n");
+  test("setup hint lists every adapter with its pinned range", () => {
+    const hint = providerSetupHint("npm").join("\n");
     for (const info of Object.values(PROVIDERS)) {
       expect(hint).toContain(`"${info.pkg}@${info.range}"`);
       expect(hint).toContain(info.env);
@@ -158,33 +154,10 @@ describe("providers", () => {
     expect(hint).toContain("latest");
   });
 
-  test("an already-declared adapter is detected in any dependency section", () => {
-    expect(
-      detectInstalledProvider({ dependencies: { "@ai-sdk/google": "2.0.86" } }),
-    ).toBe("google");
-    expect(
-      detectInstalledProvider({ devDependencies: { "@ai-sdk/openai": "^2" } }),
-    ).toBe("openai");
-    expect(
-      detectInstalledProvider({ peerDependencies: { "@ai-sdk/anthropic": "^2" } }),
-    ).toBe("anthropic");
-  });
-
-  test("no adapter, or only non-adapter deps, detects nothing", () => {
-    expect(detectInstalledProvider({})).toBeUndefined();
-    expect(
-      detectInstalledProvider({ dependencies: { ai: "^5", zod: "^4" } }),
-    ).toBeUndefined();
-  });
-
-  test("two adapters tie-break on PROVIDERS order, not object iteration", () => {
-    const first = (Object.keys(PROVIDERS) as (keyof typeof PROVIDERS)[])[0];
-    expect(
-      detectInstalledProvider({
-        dependencies: { "@ai-sdk/google": "^2" },
-        devDependencies: { "@ai-sdk/openai": "^2" },
-      }),
-    ).toBe(first);
+  test("setup hint warns off the browser-visible env prefixes", () => {
+    const hint = providerSetupHint("bun").join("\n");
+    expect(hint).toContain("VITE_");
+    expect(hint).toContain("NEXT_PUBLIC_");
   });
 
   test("no provider adapter is a dependency of the registry (invariant 12)", () => {
@@ -197,6 +170,67 @@ describe("providers", () => {
     for (const info of Object.values(PROVIDERS)) {
       expect(registryPkg.dependencies?.[info.pkg]).toBeUndefined();
     }
+  });
+
+  test("the CLI declares no provider adapter either", () => {
+    const cliPkg = JSON.parse(
+      readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+    ) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    for (const info of Object.values(PROVIDERS)) {
+      expect(cliPkg.dependencies?.[info.pkg]).toBeUndefined();
+      expect(cliPkg.devDependencies?.[info.pkg]).toBeUndefined();
+    }
+  });
+});
+
+describe("agentModelPath", () => {
+  test("sits beside the scaffolded dir, never inside it", () => {
+    expect(agentModelPath("src/agent")).toBe("src/agent-model.ts");
+    expect(agentModelPath("app/agent")).toBe("app/agent-model.ts");
+    expect(agentModelPath("src/lib/agent")).toBe("src/lib/agent-model.ts");
+  });
+
+  test("a project-root dir puts the stub at the project root", () => {
+    expect(agentModelPath("agent")).toBe("agent-model.ts");
+  });
+
+  test("trailing slashes and windows separators normalise", () => {
+    expect(agentModelPath("src/agent/")).toBe("src/agent-model.ts");
+    expect(agentModelPath("src\\agent")).toBe("src/agent-model.ts");
+  });
+});
+
+describe("agentModelStub", () => {
+  test("exports a typed model and throws until one is supplied", () => {
+    const stub = agentModelStub("npm");
+    expect(stub).toContain('import type { LanguageModel } from "ai"');
+    expect(stub).toContain("export const model: LanguageModel");
+    expect(stub).toContain("throw new Error");
+  });
+
+  test("carries the pinned install command for every adapter", () => {
+    const stub = agentModelStub("pnpm");
+    for (const info of Object.values(PROVIDERS)) {
+      expect(stub).toContain(`pnpm add "${info.pkg}@${info.range}"`);
+      expect(stub).toContain(info.env);
+    }
+  });
+
+  test("warns off the browser-visible env prefixes", () => {
+    const stub = agentModelStub("npm");
+    expect(stub).toContain("VITE_");
+    expect(stub).toContain("NEXT_PUBLIC_");
+  });
+
+  test("the comment block never terminates itself early", () => {
+    // Every install command and example line is interpolated into one JSDoc
+    // block; a stray */ from PROVIDERS data would split the file into
+    // syntax garbage that only a scaffolded consumer would ever compile.
+    const stub = agentModelStub("yarn");
+    expect(stub.split("*/").length - 1).toBe(1);
   });
 });
 
@@ -353,8 +387,8 @@ describe("styleImportSpecifier", () => {
 });
 
 describe("buildAgentConfig", () => {
-  test("records version, paths, provider, and hashes", () => {
-    const config = buildAgentConfig("0.1.0", "src/agent", "anthropic", {
+  test("records version, paths, and hashes", () => {
+    const config = buildAgentConfig("0.1.0", "src/agent", {
       "index.ts": "abc123",
     });
     expect(config).toEqual({
@@ -362,9 +396,13 @@ describe("buildAgentConfig", () => {
       cli: "0.1.0",
       dir: "src/agent",
       content: "content/agent",
-      provider: "anthropic",
       files: { "index.ts": "abc123" },
     });
+  });
+
+  test("no provider is recorded — the model is the consumer's, not init's", () => {
+    const config = buildAgentConfig("0.1.0", "src/agent", {});
+    expect(config).not.toHaveProperty("provider");
   });
 
   test("the published schema stays in step with what init writes", () => {
@@ -375,7 +413,7 @@ describe("buildAgentConfig", () => {
       required: string[];
       properties: Record<string, { enum?: string[] }>;
     };
-    const config = buildAgentConfig("0.1.0", "src/agent", "none", {});
+    const config = buildAgentConfig("0.1.0", "src/agent", {});
     expect(schema.$id).toBe(AGENT_CONFIG_SCHEMA_URL);
     expect(config.$schema).toBe(AGENT_CONFIG_SCHEMA_URL);
     for (const key of Object.keys(config)) {
@@ -384,8 +422,10 @@ describe("buildAgentConfig", () => {
     for (const key of schema.required) {
       expect(Object.keys(config)).toContain(key);
     }
-    expect(schema.properties.provider?.enum?.toSorted()).toEqual(
-      [...Object.keys(PROVIDERS), "none"].toSorted(),
+    // `additionalProperties: false` means a leftover property here would make
+    // every file init writes invalid against its own published schema.
+    expect(Object.keys(schema.properties).toSorted()).toEqual(
+      Object.keys(config).toSorted(),
     );
   });
 });

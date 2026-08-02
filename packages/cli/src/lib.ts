@@ -8,8 +8,14 @@ import { posix } from "node:path";
 /** A user-facing failure with a message safe to print without a stack trace. */
 export class CliError extends Error {}
 
+/**
+ * Reference data for the adapters a consumer can install. The CLI never installs
+ * one and never writes provider code — the model is supplied by the consumer at
+ * the `agent-model.ts` seam — so this exists purely to print accurate install
+ * commands and env var names.
+ */
 export interface ProviderInfo {
-  /** Adapter package added to the *consumer's* project (invariant 12 — never a dependency of this repo). */
+  /** Adapter package installed in the *consumer's* project (invariant 12 — never a dependency of this repo). */
   pkg: string;
   /** Semver range compatible with AI SDK v5. `latest` adapters target a newer `ai` major and fail. */
   range: string;
@@ -17,8 +23,8 @@ export interface ProviderInfo {
   env: string;
   /** Default provider instance exported by the adapter package. */
   importName: string;
-  /** Model id for hints — rolling aliases where the provider offers them, so hints never retire. */
-  defaultModel: string;
+  /** Model id for the example line — rolling aliases where the provider offers them, so hints never retire. */
+  exampleModel: string;
   label: string;
 }
 
@@ -28,7 +34,7 @@ export const PROVIDERS = {
     range: "^2",
     env: "OPENAI_API_KEY",
     importName: "openai",
-    defaultModel: "gpt-4o-mini",
+    exampleModel: "gpt-4o-mini",
     label: "OpenAI",
   },
   anthropic: {
@@ -36,7 +42,7 @@ export const PROVIDERS = {
     range: "^2",
     env: "ANTHROPIC_API_KEY",
     importName: "anthropic",
-    defaultModel: "claude-haiku-4-5",
+    exampleModel: "claude-haiku-4-5",
     label: "Anthropic",
   },
   google: {
@@ -44,16 +50,10 @@ export const PROVIDERS = {
     range: "^2",
     env: "GOOGLE_GENERATIVE_AI_API_KEY",
     importName: "google",
-    defaultModel: "gemini-flash-latest",
+    exampleModel: "gemini-flash-latest",
     label: "Google (Gemini)",
   },
 } as const satisfies Record<string, ProviderInfo>;
-
-export type ProviderId = keyof typeof PROVIDERS;
-
-export function isProviderId(value: string): value is ProviderId {
-  return Object.hasOwn(PROVIDERS, value);
-}
 
 const TEMPLATE_EXTENSIONS = [".ts", ".tsx", ".css"];
 
@@ -141,49 +141,112 @@ export function addCommand(pm: PackageManager, spec: string): string {
 }
 
 /**
- * The provider whose adapter the project already declares, if any.
- *
- * A non-interactive run has no answer to the provider question and used to
- * assume `none`, which on a re-run means telling a project that already has
- * `@ai-sdk/google` that no adapter was installed — and writing that `none` into
- * `.agent.json`, losing a fact that was previously right. What the project
- * declares is the better answer than a default, so init asks the manifest.
- *
- * `PROVIDERS` order breaks ties: a project with two adapters has no single
- * correct answer, and picking deterministically beats picking by object
- * iteration.
+ * One `install <adapter>  # <label> — reads <ENV_VAR>` line per provider, with
+ * the comments aligned into a column. Shared by the printed hint and the model
+ * stub's header, so the two can never drift.
  */
-export function detectInstalledProvider(
-  pkg: PackageJsonLike,
-): ProviderId | undefined {
-  const declared = new Set([
-    ...Object.keys(pkg.dependencies ?? {}),
-    ...Object.keys(pkg.devDependencies ?? {}),
-    ...Object.keys(pkg.peerDependencies ?? {}),
-  ]);
-  const ids = Object.keys(PROVIDERS) as ProviderId[];
-  return ids.find((id) => declared.has(PROVIDERS[id].pkg));
+function providerInstallLines(pm: PackageManager): string[] {
+  const commands = Object.values<ProviderInfo>(PROVIDERS).map((info) => ({
+    command: addCommand(pm, `${info.pkg}@${info.range}`),
+    info,
+  }));
+  const width = Math.max(...commands.map((entry) => entry.command.length));
+  return commands.map(
+    ({ command, info }) =>
+      `${command.padEnd(width)}  # ${info.label} — reads ${info.env}`,
+  );
 }
 
 /**
- * Printed when init finishes without a provider (the `--yes`/non-interactive
- * default). Field-tested failure this prevents: installing an adapter at
- * `latest` pairs with a newer `ai` major and throws
- * AI_UnsupportedModelVersionError against the templates' ai@^5, so the hint
- * spells out the pinned installs.
+ * The adapter install commands, printed on every run.
+ *
+ * agent-ui does not choose a provider, install an adapter, or generate provider
+ * code: `createAgentHandler` takes a `LanguageModel`, and which one it is stays
+ * the consumer's decision. What the CLI still owes them is the *pinned* range —
+ * installing an adapter at `latest` pairs with a newer `ai` major and throws
+ * AI_UnsupportedModelVersionError against the templates' ai@^5, and that trap is
+ * invisible until the first request.
  */
-export function noProviderHint(pm: PackageManager): string[] {
+export function providerSetupHint(pm: PackageManager): string[] {
   const lines = [
-    "⚠ No provider adapter was installed. Add one before mounting the server",
-    "  handler — pinned to the AI SDK 5-compatible major shown below. Installing",
-    "  `latest` targets a newer `ai` major and fails with the templates' ai@^5.",
+    "Install one provider adapter — pinned to the AI SDK 5-compatible major",
+    "below. `latest` targets a newer `ai` major and fails against the templates'",
+    "ai@^5 with AI_UnsupportedModelVersionError.",
+    "",
   ];
-  for (const info of Object.values<ProviderInfo>(PROVIDERS)) {
-    lines.push(
-      `    ${addCommand(pm, `${info.pkg}@${info.range}`)}   # ${info.label} — reads ${info.env}`,
-    );
-  }
+  for (const line of providerInstallLines(pm)) lines.push(`    ${line}`);
+  lines.push(
+    "",
+    "Put that adapter's key in a server-side .env at your project root. Never",
+    "prefix it VITE_ or NEXT_PUBLIC_ — those prefixes publish the value to the",
+    "browser. The adapter reads process.env itself; you never pass the key to",
+    "createAgentHandler.",
+  );
   return lines;
+}
+
+/**
+ * Where the model stub goes: a sibling of the scaffolded source, not a file
+ * inside it.
+ *
+ * `--dir` is hash-tracked in `.agent.json` so a future `agent-ui update` can
+ * tell edited files from untouched ones, which makes it the wrong home for a
+ * file whose whole purpose is to be edited. This is the split `theme.css` and
+ * `styles.css` already draw: the file you edit and the file we rewrite are
+ * different files.
+ */
+export function agentModelPath(dir: string): string {
+  const trimmed = toPosix(dir).replace(/\/+$/, "");
+  const parent = posix.dirname(trimmed);
+  return parent === "." ? "agent-model.ts" : `${parent}/agent-model.ts`;
+}
+
+/**
+ * Contents of the model stub — the one file a consumer must edit before the
+ * assistant can answer anything.
+ *
+ * It throws rather than exporting a cast-from-null placeholder. Both fail on an
+ * unconfigured install; only one says why. The alternative surfaces as an
+ * SDK-internal error on the first message, several layers from the file that
+ * needs the edit.
+ */
+export function agentModelStub(pm: PackageManager): string {
+  const options = providerInstallLines(pm)
+    .map((line) => ` *      ${line}`)
+    .join("\n");
+  const example = PROVIDERS.openai;
+  return `import type { LanguageModel } from "ai";
+
+/**
+ * The model this site's assistant runs on.
+ *
+ * Server-only. Your API route imports this; browser code never does, and the
+ * key never leaves the server.
+ *
+ * 1. Install one adapter, at the pinned major — \`latest\` targets a newer \`ai\`
+ *    major and fails with AI_UnsupportedModelVersionError:
+ *
+${options}
+ *
+ * 2. Replace the export below:
+ *
+ *      import { ${example.importName} } from "${example.pkg}";
+ *      export const model: LanguageModel = ${example.importName}("${example.exampleModel}");
+ *
+ * 3. Put the key in a server-side .env at your project root. Never prefix it
+ *    VITE_ or NEXT_PUBLIC_ — those prefixes publish the value to the browser.
+ *    The adapter reads process.env itself; you never pass the key to
+ *    createAgentHandler.
+ */
+export const model: LanguageModel = notConfigured();
+
+function notConfigured(): LanguageModel {
+  throw new Error(
+    "agent-ui: no model configured yet — edit agent-model.ts and export one. " +
+      "See the comment at the top of that file.",
+  );
+}
+`;
 }
 
 /**
@@ -280,8 +343,11 @@ export function needsNodeTypes(tsconfigText: string): boolean {
  * Vite parses `.env` into `import.meta.env` and only for `VITE_`-prefixed names,
  * while the provider adapter runs in the Node process and reads `process.env`.
  * Nothing connects the two by default, so a correctly-placed key produces
- * `AI_LoadAPIKeyError` on the very first message — the failure lands one step
- * after the last one init used to describe.
+ * `AI_LoadAPIKeyError` on the very first message.
+ *
+ * Gated on a Vite config alone: the CLI no longer knows which adapter the
+ * consumer will reach for, but every one of them reads `process.env`, so the
+ * gap is a property of the runtime rather than of the provider.
  */
 export function viteEnvHint(config: string): string[] {
   return [
@@ -358,7 +424,6 @@ export interface AgentConfig {
   dir: string;
   /** Markdown content directory for `agent-ui sync` (invariant 11 default). */
   content: string;
-  provider: ProviderId | "none";
   /** Install-time sha256 per template file, for the future `agent-ui update`. */
   files: Record<string, string>;
 }
@@ -366,7 +431,6 @@ export interface AgentConfig {
 export function buildAgentConfig(
   cliVersion: string,
   dir: string,
-  provider: ProviderId | "none",
   files: Record<string, string>,
 ): AgentConfig {
   return {
@@ -374,7 +438,6 @@ export function buildAgentConfig(
     cli: cliVersion,
     dir,
     content: "content/agent",
-    provider,
     files,
   };
 }

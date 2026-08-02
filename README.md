@@ -111,11 +111,12 @@ something is not working.
 | # | Step | You are done when |
 | --- | --- | --- |
 | 1 | Scaffold the source | `src/agent/` and `.agent.json` exist, dependencies installed |
-| 2 | Render `<AgentChat>` | The launcher appears and the panel opens |
-| 3 | Describe your pages | A public manifest and a server manifest with content |
-| 4 | Mount the server route + key | `POST /api/agent` streams a reply |
+| 2 | Choose a model | An adapter is installed and `src/agent-model.ts` exports a `LanguageModel` |
+| 3 | Render `<AgentChat>` | The launcher appears and the panel opens |
+| 4 | Describe your pages | A public manifest and a server manifest with content |
+| 5 | Mount the server route | `POST /api/agent` streams a reply |
 
-Steps 3 and 4 are the two people skip. Without a server route the panel opens
+Steps 4 and 5 are the two people skip. Without a server route the panel opens
 and every message fails; without page content the assistant answers "that is not
 in the site content" to everything. Both have a symptom row in
 [Troubleshooting](#troubleshooting).
@@ -123,8 +124,8 @@ in the site content" to everything. Both have a symptom row in
 ### 1. Scaffold
 
 ```bash
-npx @tuann72/agent-ui@latest init --provider google
-# or: bunx @tuann72/agent-ui@latest init --provider google
+npx @tuann72/agent-ui@latest init
+# or: bunx @tuann72/agent-ui@latest init
 ```
 
 Keep the `@latest`: the templates ship inside the versioned CLI, so a cached
@@ -134,10 +135,43 @@ The CLI copies the agent-ui source into `src/agent`, writes `.agent.json`, and
 adds the required AI SDK v5 dependencies without replacing ranges already in
 your project. Run your package manager's install command afterward.
 
-The templates use `ai@^5` and the `^2` provider adapters. Keep those paired;
-installing a newer adapter major can cause `AI_UnsupportedModelVersionError`.
+It also writes `src/agent-model.ts` — a stub beside the scaffolded source, and
+the one file you have to edit before anything answers. It is a sibling rather
+than a member of `src/agent/` on purpose: everything inside that directory is
+hash-tracked so a future `agent-ui update` can replace it, and a file you are
+meant to edit does not belong in a directory we rewrite. An existing
+`agent-model.ts` is never overwritten, `--force` included.
 
-### 2. Render the assistant
+### 2. Choose a model
+
+agent-ui does not pick a provider for you, install an adapter, or generate
+provider code. `createAgentHandler` takes a `LanguageModel`, and which one it is
+is your decision — so it lives in a file you own:
+
+```bash
+npm install "@ai-sdk/google@^2"   # or @ai-sdk/openai@^2, @ai-sdk/anthropic@^2
+```
+
+```ts
+// src/agent-model.ts — server-only, never imported from browser code
+import { google } from "@ai-sdk/google";
+import type { LanguageModel } from "ai";
+
+export const model: LanguageModel = google("gemini-flash-latest");
+```
+
+**Pin the adapter to `^2`.** The templates run `ai@^5`, which pairs with the `^2`
+adapter majors; installing one at `latest` pulls a newer `ai` major and throws
+`AI_UnsupportedModelVersionError` on the first request. The
+[provider reference](#provider-reference) has the range and environment variable
+for each. The key itself goes in a server-side `.env` — see
+[The API key](#the-api-key).
+
+Until you edit it, the stub throws a message naming itself, so an unconfigured
+install fails at startup with an actionable error rather than deep inside the
+SDK on someone's first message.
+
+### 3. Render the assistant
 
 ```tsx
 import "./agent/styles.css";
@@ -164,7 +198,7 @@ One import is all you need: `styles.css` pulls in `theme.css` itself. Edit
 `theme.css` for colors, radius, and sizing — that is the file meant to be
 yours, and the one `agent-ui update` leaves alone.
 
-### 3. Define site knowledge
+### 4. Define site knowledge
 
 Until `agent-ui sync` ships, describe your pages in one browser-safe manifest,
 then add the markdown in a second, server-only file. Each page is written once:
@@ -257,7 +291,7 @@ tool for more excerpts. All of it is delimited and labeled untrusted, so
 instructions embedded in your markdown are treated as data, not commands. The
 manifests above are the only input, and nothing is crawled from the live DOM.
 
-### 4. Add the server route
+### 5. Add the server route
 
 `createAgentHandler` is a Fetch-standard `Request → Response` handler. Provider
 credentials and model selection stay server-side.
@@ -266,14 +300,11 @@ credentials and model selection stay server-side.
 
 ```ts
 // app/api/agent/route.ts
-import { google } from "@ai-sdk/google";
 import { createAgentHandler } from "@/agent/server";
+import { model } from "@/agent-model";
 import { serverManifest } from "@/manifest.server";
 
-export const POST = createAgentHandler({
-  model: google("gemini-flash-latest"),
-  manifest: serverManifest,
-});
+export const POST = createAgentHandler({ model, manifest: serverManifest });
 ```
 
 #### React Router v7, TanStack Start, Hono, and other Fetch-standard hosts
@@ -283,10 +314,7 @@ hands you the raw request can host it. Build the handler once at module scope
 and forward the request from whatever export shape the framework asks for:
 
 ```ts
-const handler = createAgentHandler({
-  model: google("gemini-flash-latest"),
-  manifest: serverManifest,
-});
+const handler = createAgentHandler({ model, manifest: serverManifest });
 
 // React Router v7 / Remix resource route (app/routes/api.agent.ts)
 export const action = ({ request }: Route.ActionArgs) => handler(request);
@@ -311,16 +339,13 @@ the included Node bridge:
 
 ```ts
 // src/agent-api.ts: server-only, never import this from browser code
-import { google } from "@ai-sdk/google";
 import { createAgentHandler } from "./agent/server";
 import { toNodeHandler } from "./agent/server/node";
+import { model } from "./agent-model";
 import { serverManifest } from "./manifest.server";
 
 export const handler = toNodeHandler(
-  createAgentHandler({
-    model: google("gemini-flash-latest"),
-    manifest: serverManifest,
-  }),
+  createAgentHandler({ model, manifest: serverManifest }),
 );
 ```
 
@@ -405,8 +430,9 @@ Three rules, in order of how often they are broken:
 2. **Use the exact variable name the adapter expects** (see the
    [provider reference](#provider-reference)). A renamed variable looks
    identical to a missing one.
-3. **Keep the model choice server-side too.** The browser cannot override the
-   model, the system prompt, or the profile; that is the point of the split.
+3. **Keep the model choice server-side too.** `agent-model.ts` is imported by
+   your route, never by browser code. The browser cannot override the model, the
+   system prompt, or the profile; that is the point of the split.
 
 Restart the dev server after editing `.env` — adapters read the environment at
 startup, so a running process keeps the old value.
@@ -442,7 +468,7 @@ If your assistant is only for signed-in users, check the session in the route
 before calling the handler — `createAgentHandler` returns a `Response`, so an
 early `return new Response(null, { status: 401 })` is the whole integration.
 
-### 5. Give the assistant an identity (optional)
+### 6. Give the assistant an identity (optional)
 
 Persona and operating instructions are server-owned, so the browser can never
 send them. Pass a structured `agent` profile, a free-form `system` string, or
@@ -450,7 +476,7 @@ both:
 
 ```ts
 export const POST = createAgentHandler({
-  model: google("gemini-flash-latest"),
+  model,
   manifest: serverManifest,
   agent: {
     role: "Front-desk guide for Basalt Bouldering Co.",
@@ -469,19 +495,27 @@ removed by either field.
 
 ### Provider reference
 
+You install one of these yourself and export it from `agent-model.ts` — agent-ui
+never adds an adapter to your `package.json`. Install the pinned major, not
+`latest`.
+
 | Provider | Adapter | Environment variable | Suggested model |
 | --- | --- | --- | --- |
 | Gemini | `@ai-sdk/google@^2` | `GOOGLE_GENERATIVE_AI_API_KEY` | `gemini-flash-latest` |
 | OpenAI | `@ai-sdk/openai@^2` | `OPENAI_API_KEY` | `gpt-4o-mini` |
 | Anthropic | `@ai-sdk/anthropic@^2` | `ANTHROPIC_API_KEY` | `claude-haiku-4-5` |
 
-Prefer rolling aliases when available because dated model IDs can retire.
+Prefer rolling aliases when available because dated model IDs can retire. Any
+other AI SDK v5 provider works too — the handler takes a `LanguageModel` and
+does not care where it came from. These three are listed because `init` prints
+their install commands.
 
 ### Troubleshooting
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
 | Panel opens, every message errors | No server route mounted, or the wrong path | Mount `createAgentHandler` and match the `api` prop to it (default `/api/agent`) |
+| `agent-ui: no model configured yet` | The `agent-model.ts` stub was never edited | Install an adapter and export a `LanguageModel` from it — see [Choose a model](#2-choose-a-model) |
 | `AI_UnsupportedModelVersionError` | Adapter major ahead of `ai@^5` | Install the `^2` adapter, not `latest` |
 | Provider 401/403 in the server log | Key missing, misnamed, or read from a `VITE_`/`NEXT_PUBLIC_` variable | Use the exact variable name from the table above in a server-side `.env`, then restart |
 | `AI_LoadAPIKeyError` on the first request, Vite dev | `.env` never reached `process.env` — Vite loads only `VITE_` names, and only into `import.meta.env` | Bridge it with `loadEnv` in `vite.config.ts` (see the Vite snippet), or run `node --env-file=.env` |
@@ -732,7 +766,7 @@ default glyph. Context hooks cover the rest: `useAgentContext`,
 
 ```bash
 bun run typecheck    # registry, CLI, and playground TypeScript
-bun test             # 225 unit and component-contract tests
+bun test             # 232 unit and component-contract tests
 bun run test:e2e     # 21 Chromium flows; starts Vite automatically
 bun run cli:build    # rebuild CLI output and bundled templates
 ```
@@ -777,10 +811,12 @@ is what lets the planned `agent-ui update` tell "untouched, safe to replace"
 from "you edited this, here is the diff" per file, instead of asking you to
 diff a whole directory. Keep `.agent.json` in version control.
 
-Until `update` ships, re-running `init --force` re-scaffolds in place. It
-preserves your `.agent.json` provider and never overwrites a dependency range
-you declared, but it *does* overwrite the source files — so commit first, and
-treat your own edits as something to re-apply from the diff.
+Until `update` ships, re-running `init --force` re-scaffolds in place. It never
+overwrites a dependency range you declared, and it never touches
+`agent-model.ts` once that file exists — that is exactly why the model stub sits
+*beside* the scaffolded directory rather than inside it. It *does* overwrite the
+source files in `--dir`, so commit first and treat your own edits there as
+something to re-apply from the diff.
 
 ## Status
 
@@ -791,11 +827,13 @@ handler, Node bridge, `agent-ui init`, mock and real-provider playground paths,
 unit/component tests, and Playwright tests.
 
 Not included, by design: **rate limiting** (put one in front of the route —
-see [Put a rate limit in front of the route](#put-a-rate-limit-in-front-of-the-route))
-and **conversation persistence** (messages live in React state, so a reload
-starts a new thread and nothing is written to `localStorage`, `sessionStorage`,
-or a cookie). Both are deployment decisions that a scaffolded file cannot make
-for you: one needs shared storage, the other needs a retention policy.
+see [Put a rate limit in front of the route](#put-a-rate-limit-in-front-of-the-route)),
+**conversation persistence** (messages live in React state, so a reload starts a
+new thread and nothing is written to `localStorage`, `sessionStorage`, or a
+cookie), and **provider/model selection** (you install an adapter and export a
+`LanguageModel` from `agent-model.ts`; the CLI never adds one). All three are
+deployment decisions a scaffolded file cannot make for you: one needs shared
+storage, one needs a retention policy, and one is a running cost in your name.
 
 Planned: `agent-ui add`, `sync`, `doctor`, and `update`; generated markdown
-manifests; framework adapters/examples; provider factories.
+manifests; framework adapters/examples.

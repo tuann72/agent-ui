@@ -15,11 +15,12 @@ Usage:
 
 Options for init:
   --dir <path>        Where to copy the agent-ui source (default: src/agent)
-  --provider <name>   openai | anthropic | google | none — adds the matching
-                      AI SDK adapter to your dependencies (default: prompt,
-                      or none when non-interactive)
   -y, --yes           Accept defaults, never prompt
   --force             Overwrite an existing .agent.json / non-empty --dir
+
+init writes an agent-model.ts stub beside --dir. Install one AI SDK v5 provider
+adapter yourself and export a LanguageModel from it; agent-ui never adds an
+adapter to your dependencies.
 
 Other commands (planned, not yet available): add, sync, doctor, update.
 `;

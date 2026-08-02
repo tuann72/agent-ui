@@ -10,7 +10,37 @@ newest templates rather than a cached CLI.
 
 ## [Unreleased]
 
+### Removed
+
+- **`--provider`, and everything behind it.** `init` no longer prompts for a
+  provider, detects an installed adapter, adds one to `package.json`, generates
+  model-wiring code, or records `provider` in `.agent.json` (the field is gone
+  from the published schema too).
+
+  `createAgentHandler` has always taken a `LanguageModel` and has never imported
+  an adapter, so none of this was load-bearing — it was the CLI holding an
+  opinion about a decision that is the consumer's, and paying for it in code
+  that tracked someone else's release cadence: pinned adapter majors, three env
+  var names, `AI_UnsupportedModelVersionError`, and the provider-detection
+  re-run bug fixed in 0.2.0.
+
+  What the CLI still owes you is the part that is invisible until the first
+  request: `init` prints the pinned install command for each common adapter, and
+  the model stub repeats it. Installing at `latest` still pulls an `ai` major
+  the templates cannot run.
+
 ### Added
+
+- `init` writes an `agent-model.ts` stub beside `--dir` (`src/agent-model.ts`
+  by default) exporting the `LanguageModel` the handler runs on. It sits outside
+  `--dir` because everything in there is hash-tracked for the future
+  `agent-ui update`, and a file meant to be edited does not belong in a
+  directory that gets rewritten — the same split `theme.css` and `styles.css`
+  already draw. An existing one is never overwritten, `--force` included.
+
+  Until edited it throws an error naming itself, so an unconfigured install
+  fails at startup with something actionable instead of an SDK-internal error on
+  someone's first message.
 
 - `init` warns about the three things that break *after* it exits successfully,
   with the fix printed inline rather than linked:
@@ -32,12 +62,13 @@ newest templates rather than a cached CLI.
   `^18 || ^19` and `react-markdown` on `>=18`, and no React 19-only API appears
   in the templates, so the previous requirement was a claim rather than a
   constraint. Development and tests still run on 19.
-- Documentation states that rate limiting and conversation persistence are the
-  consumer's, not agent-ui's. `POST /api/agent` is unauthenticated and spends
-  money per request; the handler bounds request *shape* (origin, body bytes,
-  message count) and never *volume*. "Durable rate limiting" used to sit in the
-  planned list, which read as a feature owed rather than a live cost exposure to
-  cover before deploying.
+- Documentation states that rate limiting, conversation persistence, and
+  provider/model selection are the consumer's, not agent-ui's. `POST /api/agent`
+  is unauthenticated and spends money per request; the handler bounds request
+  *shape* (origin, body bytes, message count) and never *volume*. "Durable rate
+  limiting" and "provider factories" used to sit in the planned list, which read
+  as features owed rather than decisions deliberately left with the person whose
+  API key and bill they are.
 
 ## [0.2.0] - 2026-08-01
 

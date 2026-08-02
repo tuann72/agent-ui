@@ -19,17 +19,17 @@ remain in consumer-owned server code.
   site is Basalt Bouldering Co. (five routes); every Agent knob lives in a
   Tweakpane control panel behind a collapsible left-edge tab.
 - `packages/cli/`: zero-runtime-dependency `@tuann72/agent-ui`. `agent-ui init`
-  copies bundled templates, writes `.agent.json` with file hashes, and adds
-  required dependencies without replacing consumer ranges. It is re-runnable:
-  every question it cannot ask must be answered from what the project already
-  states — the provider comes from the adapter in `package.json`, not from a
-  default — so `--force` never downgrades a fact that was already right.
-- Tests: 225 unit/component tests and 21 Playwright flows.
+  copies bundled templates, writes `.agent.json` with file hashes, adds required
+  dependencies without replacing consumer ranges, and writes the
+  `agent-model.ts` stub (invariant 18). It asks nothing and installs no
+  provider, so a re-run under `--force` has no answer it could downgrade.
+- Tests: 232 unit/component tests and 21 Playwright flows.
 
 Not built yet: `agent-ui add`, `sync`, `doctor`, and `update`; markdown
-ingestion; framework adapters/example apps; provider factories.
-Deliberately out of scope, not a backlog: rate limiting (invariant 7) and
-conversation persistence (invariant 16).
+ingestion; framework adapters/example apps.
+Deliberately out of scope, not a backlog: rate limiting (invariant 7),
+conversation persistence (invariant 16), and provider/model selection
+(invariant 18).
 Those CLI commands currently report that they are unavailable. ADR 003's
 registered action registry is accepted but unimplemented. The client tool set
 is still exactly `navigate`, `highlight`, and `interact` (plus the
@@ -184,7 +184,11 @@ Do not weaken these constraints.
     assume the Bun behavior when writing consumer-facing docs.
 12. **Provider neutrality:** no provider adapter may appear in a committed
     package manifest. `scripts/dev-real.ts` is neutral; its adapter install and
-    generated `*.local.ts` module remain uncommitted.
+    generated `*.local.ts` module remain uncommitted. This now holds
+    structurally for consumers too: `init` has no `--provider` flag, installs no
+    adapter, and generates no provider code. `PROVIDERS` in `lib.ts` is
+    reference data for printed install commands — pinned ranges and env var
+    names — and nothing may reintroduce a code path that acts on it.
 13. **Distribution allowlist:** templates contain only declared runtime files
     and dependencies, never apps, tests, fixtures, screenshots, env files,
     development manifests, or provider-specific artifacts.
@@ -219,6 +223,17 @@ Do not weaken these constraints.
     printed inline. Do not answer one of these with a link: the failure lands
     after the last step init described, and a README found afterwards has
     already cost the debugging session.
+18. **The model is the consumer's, at a seam init writes once:**
+    `createAgentHandler` takes a `LanguageModel` and never imports an adapter,
+    so choosing one is not agent-ui's decision. `init` writes an
+    `agent-model.ts` stub *beside* `--dir`, never inside it: everything in
+    `--dir` is hash-tracked for a future `agent-ui update`, and a file whose
+    purpose is to be edited cannot live in a directory we rewrite — the same
+    split `theme.css` and `styles.css` already draw. The stub throws until
+    edited rather than exporting a cast-from-null placeholder, so an
+    unconfigured install fails at startup naming the file to fix instead of
+    surfacing as an SDK-internal error on a first message. An existing
+    `agent-model.ts` is always kept, `--force` included.
 
 ## Component and styling rules
 
