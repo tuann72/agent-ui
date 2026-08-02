@@ -57,6 +57,30 @@ export {
   type UseAgentChatOptions,
   type UseAgentChatReturn,
 } from "./core/use-agent-chat";
+/**
+ * The tool contract. Exported because a consumer who replaces the bundled
+ * handler has to declare the same four tools, by the same names, with the same
+ * schemas, and teach the model the same ordering rules — otherwise this client
+ * receives calls it will not execute. Importing beats reimplementing from the
+ * README.
+ *
+ * The zod schemas are deliberately *not* re-exported here. This module is the
+ * client entry point, so anything it exports as a value is reachable from the
+ * browser bundle; server code imports them from `core/contract.schemas`
+ * directly, which is the only import path that touches zod.
+ */
+export {
+  AGENT_TOOL_NAMES,
+  AGENT_TOOL_PART_TYPES,
+  CLIENT_TOOL_NAMES,
+  SERVER_TOOL_NAMES,
+  TOOL_DESCRIPTIONS,
+  TOOL_ORDERING_PROTOCOL,
+  TOOL_SECURITY_RULE,
+  type AgentClientToolName,
+  type AgentServerToolName,
+  type AgentToolPartType,
+} from "./core/contract";
 export { dismissHighlight, runHighlight } from "./core/highlight";
 export { runInteract } from "./core/interact";
 export { findTargetElement } from "./core/target";

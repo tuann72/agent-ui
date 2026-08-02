@@ -79,3 +79,31 @@ jobs:
           }
           JSON
           npx tsc -p .
+
+      # The frameworkless project above detects as "unknown", so init writes no
+      # route file and nothing above ever compiles one. The generated routes are
+      # the highest-risk output the CLI has — they land in someone else's repo
+      # and fail at *their* next build — so one gets compiled here.
+      #
+      # An `app/layout.tsx` is the whole disguise: detection is by root layout,
+      # and the Next and React Router templates are typed off the `Request`
+      # global, so neither framework has to be installed to typecheck them.
+      - name: A generated route must typecheck too
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/next-consumer/app"
+          cd "$RUNNER_TEMP/next-consumer"
+          npm init -y >/dev/null
+          npm pkg set dependencies.react="^19.2.7" >/dev/null
+          echo 'export default function Layout() { return null; }' > app/layout.tsx
+          echo 'export default function Page() { return null; }' > app/page.tsx
+          npm install --no-audit --no-fund "$RUNNER_TEMP"/*.tgz
+          npx agent-ui init --yes
+          test -f app/api/agent/route.ts || { echo "no route file written"; exit 1; }
+          test -f src/agent-manifest.ts || { echo "no manifest written"; exit 1; }
+          npm install --no-audit --no-fund
+          npm install --no-audit --no-fund -D typescript@5
+          cp "$RUNNER_TEMP/consumer/tsconfig.json" .
+          npx json -I -f tsconfig.json -e 'this.include=["src","app"]' 2>/dev/null \
+            || node -e 'const f="tsconfig.json",j=require("./"+f);j.include=["src","app"];require("fs").writeFileSync(f,JSON.stringify(j,null,2))'
+          npx tsc -p .

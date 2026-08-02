@@ -1,32 +1,91 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import { parseArgs } from "node:util";
 import {
   addCommand,
   AGENT_CONFIG_SCHEMA_URL,
   agentModelPath,
   agentModelStub,
+  argvErrorMessage,
   buildAgentConfig,
   detectPackageManager,
+  INIT_OPTIONS_HELP,
   installCommand,
   isTemplateFile,
   mergeDependencies,
   MIN_REACT_MAJOR,
+  agentManifestPath,
+  importSpecifier,
   needsNodeTypes,
-  pickRootLayout,
   pickViteConfig,
   PROVIDERS,
   providerSetupHint,
   reactVersionWarning,
-  ROOT_LAYOUT_FILES,
   styleImportSpecifier,
   viteEnvHint,
+  withoutExtension,
 } from "./lib";
 
-/** `pickRootLayout`'s fs probe, backed by a fixed set instead of a disk. */
+/** An fs probe backed by a fixed set instead of a disk. */
 const present =
   (...files: string[]) =>
   (file: string) =>
     files.includes(file);
+
+describe("argvErrorMessage", () => {
+  /**
+   * Real `parseArgs` failures rather than hand-built codes: the point of the
+   * helper is that Node's own errors reach the user readable, so a Node upgrade
+   * that changes them should fail here rather than in someone's terminal.
+   */
+  const argvError = (args: string[]): unknown => {
+    try {
+      parseArgs({
+        args,
+        options: {
+          dir: { type: "string", default: "src/agent" },
+          yes: { type: "boolean", short: "y", default: false },
+          force: { type: "boolean", default: false },
+        },
+      });
+    } catch (error) {
+      return error;
+    }
+    throw new Error(`expected ${args.join(" ")} to be rejected`);
+  };
+
+  test("names the rejected flag and lists the real ones", () => {
+    const message = argvErrorMessage(argvError(["--porvider"]));
+    expect(message).toContain("--porvider");
+    expect(message).toContain("Options for init:");
+    expect(message).toContain(INIT_OPTIONS_HELP);
+  });
+
+  test("explains --provider, the likeliest wrong flag", () => {
+    // It was a real flag until the model became the consumer's; anyone working
+    // from a draft or a copied command still types it.
+    expect(argvErrorMessage(argvError(["--provider", "google"]))).toContain(
+      "Unknown option '--provider'",
+    );
+  });
+
+  test("drops Node's `--` advice, which init cannot act on", () => {
+    // init takes no positionals, so following that hint produces a second error.
+    expect(argvErrorMessage(argvError(["--nope"]))).not.toContain("after '--'");
+  });
+
+  test("covers a missing option value and a stray positional", () => {
+    expect(argvErrorMessage(argvError(["--dir"]))).toContain("--dir");
+    expect(argvErrorMessage(argvError(["src/agent"]))).toContain("src/agent");
+  });
+
+  test("declines anything that is not an argv error", () => {
+    // A real bug must keep its stack trace instead of being blamed on the user.
+    expect(argvErrorMessage(new TypeError("x is not a function"))).toBeUndefined();
+    expect(argvErrorMessage(undefined)).toBeUndefined();
+    expect(argvErrorMessage({ code: "ENOENT" })).toBeUndefined();
+  });
+});
 
 describe("isTemplateFile", () => {
   test("accepts runtime source by extension", () => {
@@ -234,41 +293,43 @@ describe("agentModelStub", () => {
   });
 });
 
-describe("pickRootLayout", () => {
-  test("recognises each framework's root", () => {
-    expect(pickRootLayout(present("app/layout.tsx"))).toBe("app/layout.tsx");
-    expect(pickRootLayout(present("app/root.tsx"))).toBe("app/root.tsx");
-    expect(pickRootLayout(present("src/routes/__root.tsx"))).toBe(
-      "src/routes/__root.tsx",
+describe("importSpecifier", () => {
+  test("rewrites a root-relative path as seen from the importing file", () => {
+    expect(importSpecifier("src/agent/server", "app/api/agent/route.ts")).toBe(
+      "../../../src/agent/server",
     );
-    expect(pickRootLayout(present("src/main.tsx"))).toBe("src/main.tsx");
-  });
-
-  test("a framework root outranks the generic entry it ships beside", () => {
-    // React Router and TanStack projects routinely keep a src/main.tsx around;
-    // the outermost module still owns the global stylesheet.
-    expect(pickRootLayout(present("src/main.tsx", "app/root.tsx"))).toBe(
-      "app/root.tsx",
-    );
-    expect(
-      pickRootLayout(present("src/App.tsx", "src/routes/__root.tsx")),
-    ).toBe("src/routes/__root.tsx");
-    expect(pickRootLayout(present("src/App.tsx", "src/main.tsx"))).toBe(
-      "src/main.tsx",
+    expect(importSpecifier("src/agent-model", "src/routes/api/agent.ts")).toBe(
+      "../../agent-model",
     );
   });
 
-  test("reports nothing when no candidate exists", () => {
-    expect(pickRootLayout(present())).toBeUndefined();
-    expect(pickRootLayout(present("index.html", "vite.config.ts"))).toBeUndefined();
+  test("always produces a relative specifier, never a bare one", () => {
+    // A bare `agent/styles.css` resolves as a package name, not a path — the
+    // one output shape that fails silently by finding something else.
+    expect(importSpecifier("src/agent/styles.css", "src/main.tsx")).toBe(
+      "./agent/styles.css",
+    );
+    expect(importSpecifier("src/agent/styles.css")).toBe("./src/agent/styles.css");
   });
+});
 
-  test("every candidate is a path styleImportSpecifier can resolve from", () => {
-    for (const file of ROOT_LAYOUT_FILES) {
-      expect(styleImportSpecifier("src/agent", file)).toMatch(
-        /^\.{1,2}\/.*styles\.css$/,
-      );
-    }
+describe("withoutExtension", () => {
+  test("strips the extension TypeScript specifiers omit", () => {
+    expect(withoutExtension("src/agent-model.ts")).toBe("src/agent-model");
+    expect(withoutExtension("src/agent-manifest.tsx")).toBe("src/agent-manifest");
+    expect(withoutExtension("src/agent/server")).toBe("src/agent/server");
+  });
+});
+
+describe("agentManifestPath", () => {
+  test("sits beside --dir, like the model stub", () => {
+    // Same rule and same reason: everything inside --dir is hash-tracked for a
+    // future `agent-ui update`, and this is a file meant to be edited.
+    expect(agentManifestPath("src/agent")).toBe("src/agent-manifest.ts");
+    expect(agentManifestPath("app/components/agent/")).toBe(
+      "app/components/agent-manifest.ts",
+    );
+    expect(agentManifestPath("agent")).toBe("agent-manifest.ts");
   });
 });
 

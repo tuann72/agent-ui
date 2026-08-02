@@ -6,7 +6,7 @@
 
 import { readFileSync } from "node:fs";
 import { runInit } from "./init";
-import { CliError } from "./lib";
+import { CliError, INIT_OPTIONS_HELP } from "./lib";
 
 const HELP = `agent-ui — scaffold the Agent assistant into your React project
 
@@ -14,9 +14,7 @@ Usage:
   npx @tuann72/agent-ui@latest init [options]
 
 Options for init:
-  --dir <path>        Where to copy the agent-ui source (default: src/agent)
-  -y, --yes           Accept defaults, never prompt
-  --force             Overwrite an existing .agent.json / non-empty --dir
+${INIT_OPTIONS_HELP}
 
 init writes an agent-model.ts stub beside --dir. Install one AI SDK v5 provider
 adapter yourself and export a LanguageModel from it; agent-ui never adds an

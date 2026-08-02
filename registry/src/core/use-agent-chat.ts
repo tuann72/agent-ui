@@ -8,6 +8,7 @@ import {
   isToolUIPart,
   lastAssistantMessageIsCompleteWithToolCalls,
 } from "ai";
+import { isAgentToolName, type AgentClientToolName } from "./contract";
 import { runHighlight } from "./highlight";
 import { runInteract } from "./interact";
 import {
@@ -30,7 +31,14 @@ import type {
   ToolPolicy,
 } from "./types";
 
-export type AgentToolName = "navigate" | "highlight" | "interact";
+/**
+ * The tools the client executes, from the contract. Kept under this name rather
+ * than renamed to `AgentClientToolName`: it is exported from the package root,
+ * so consumers have it in their own signatures.
+ */
+export type AgentToolName = AgentClientToolName;
+
+export { isAgentToolName };
 
 export interface AgentReplayAction {
   toolName: AgentToolName;
@@ -42,11 +50,6 @@ export interface AgentReplayResult {
   output: AgentToolOutput;
   /** Later actions are recorded as skipped after the first replay failure. */
   skipped?: boolean;
-}
-
-/** Runtime guard for model-supplied tool names — never trust the wire. */
-export function isAgentToolName(name: unknown): name is AgentToolName {
-  return name === "navigate" || name === "highlight" || name === "interact";
 }
 
 function stringField(input: unknown, key: string): string | undefined {
@@ -336,7 +339,12 @@ export function useAgentChat(options: UseAgentChatOptions): UseAgentChatReturn {
       if (!isAgentToolName(toolName)) {
         void helpers.addToolOutput({
           state: "output-error",
-          tool: toolName,
+          // The one place a name from outside the contract is legitimate: the
+          // model invented a tool, and the error has to be addressed back to
+          // whatever it called. No typed map can describe a tool that does not
+          // exist, so the cast is the assertion that this branch is the
+          // exception rather than a gap in the contract.
+          tool: toolName as AgentToolName,
           toolCallId: toolCall.toolCallId,
           errorText: "unknown-tool",
         });

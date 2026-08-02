@@ -17,15 +17,24 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import {
+  detectHost,
+  mountHint,
+  pickRootLayout,
+  routeFilePath,
+  routeTemplate,
+  type RouteTemplateContext,
+} from "./hosts";
+import {
+  agentManifestPath,
   agentModelPath,
   agentModelStub,
+  argvErrorMessage,
   buildAgentConfig,
   CliError,
   detectPackageManager,
   installCommand,
   mergeDependencies,
   needsNodeTypes,
-  pickRootLayout,
   pickViteConfig,
   providerSetupHint,
   reactVersionWarning,
@@ -33,6 +42,8 @@ import {
   TSCONFIG_FILES,
   viteEnvHint,
 } from "./lib";
+import { discoverRoutes, manifestStarter } from "./manifest-starter";
+import { createPrompter } from "./prompt";
 
 /** Bundled at build time by scripts/bundle-templates.ts, next to dist/. */
 const templatesRoot = fileURLToPath(new URL("../templates", import.meta.url));
@@ -56,15 +67,70 @@ function walkFiles(root: string): string[] {
   return out.sort();
 }
 
+/** Directories a route convention never lives in, and that are expensive to walk. */
+const SKIP_DIRS = new Set([
+  "node_modules",
+  ".git",
+  ".next",
+  ".output",
+  ".vercel",
+  ".turbo",
+  "dist",
+  "build",
+  "coverage",
+  "out",
+]);
+
+/**
+ * Project-root-relative source paths, for route discovery.
+ *
+ * Bounded on purpose: route conventions are shallow (`app/`, `src/routes/`), and
+ * an unbounded walk of someone's repository is a surprising amount of IO for a
+ * feature whose whole output is a starter file. A project deep enough to exceed
+ * these limits gets the placeholder manifest, which is the same thing it would
+ * get from an unrecognized framework.
+ */
+function projectSourceFiles(root: string, maxDepth = 6, maxFiles = 4_000): string[] {
+  const out: string[] = [];
+  const visit = (dir: string, depth: number) => {
+    if (depth > maxDepth || out.length >= maxFiles) return;
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return; // Unreadable directory: not worth failing an otherwise fine init.
+    }
+    for (const entry of entries) {
+      if (out.length >= maxFiles) return;
+      if (entry.name.startsWith(".") && entry.name !== ".") continue;
+      if (entry.isDirectory()) {
+        if (SKIP_DIRS.has(entry.name)) continue;
+        visit(join(dir, entry.name), depth + 1);
+      } else if (/\.(tsx|jsx|ts|js)$/.test(entry.name)) {
+        out.push(relative(root, join(dir, entry.name)).split("\\").join("/"));
+      }
+    }
+  };
+  visit(root, 0);
+  return out;
+}
+
 export async function runInit(argv: string[], cliVersion: string): Promise<void> {
-  const { values } = parseArgs({
-    args: argv,
-    options: {
-      dir: { type: "string", default: "src/agent" },
-      yes: { type: "boolean", short: "y", default: false },
-      force: { type: "boolean", default: false },
-    },
-  });
+  let values: { dir?: string; yes?: boolean; force?: boolean };
+  try {
+    ({ values } = parseArgs({
+      args: argv,
+      options: {
+        dir: { type: "string", default: "src/agent" },
+        yes: { type: "boolean", short: "y", default: false },
+        force: { type: "boolean", default: false },
+      },
+    }));
+  } catch (error) {
+    const message = argvErrorMessage(error);
+    if (message === undefined) throw error;
+    throw new CliError(message);
+  }
   const dir = values.dir ?? "src/agent";
   const cwd = process.cwd();
 
@@ -146,6 +212,7 @@ export async function runInit(argv: string[], cliVersion: string): Promise<void>
   const layout = pickRootLayout(exists);
   const viteConfig = pickViteConfig(exists);
   const reactWarning = reactVersionWarning(devMerge.pkg);
+  const host = detectHost(exists, devMerge.pkg);
 
   // The compiler-visibility gap that `@types/node` in devDependencies does not
   // close, checked against the nearest config that owns the app's `types`.
@@ -163,12 +230,69 @@ export async function runInit(argv: string[], cliVersion: string): Promise<void>
     writeFileSync(join(cwd, modelPath), agentModelStub(pm));
   }
 
+  const manifestStarterPath = agentManifestPath(src);
+  const routePath = routeFilePath(host);
+  const routeContext: RouteTemplateContext = {
+    dir: src,
+    modelPath,
+    manifestPath: manifestStarterPath,
+    routePath,
+  };
+
   console.log(`\nAgent scaffolded into ${dir} (${fileCount} files).`);
+  console.log(`Detected ${host.label}${host.layout ? ` (${host.layout})` : ""}.`);
+
+  // The two files that turn a scaffold into a working install. Both sit beside
+  // `--dir` for the same reason the model stub does, both are the consumer's to
+  // edit, and neither is ever overwritten — `--force` re-scaffolds our source,
+  // not their content.
+  const prompter = createPrompter({ yes: values.yes ?? false });
+  let routeWritten: string | undefined;
+  let manifestWritten: string | undefined;
+  try {
+    const route = routePath ? routeTemplate(host.kind, routeContext) : undefined;
+    if (routePath !== undefined && route !== undefined) {
+      if (exists(routePath)) {
+        console.log(`Kept your existing ${routePath}.`);
+      } else if (
+        await prompter.confirm(`\nWrite the API route to ${routePath}?`, true)
+      ) {
+        mkdirSync(dirname(join(cwd, routePath)), { recursive: true });
+        writeFileSync(join(cwd, routePath), route);
+        routeWritten = routePath;
+      }
+    }
+
+    if (exists(manifestStarterPath)) {
+      console.log(`Kept your existing ${manifestStarterPath}.`);
+    } else if (
+      await prompter.confirm(
+        `Write a starter site manifest to ${manifestStarterPath}?`,
+        true,
+      )
+    ) {
+      const routes = discoverRoutes(host.kind, projectSourceFiles(cwd));
+      mkdirSync(dirname(join(cwd, manifestStarterPath)), { recursive: true });
+      writeFileSync(
+        join(cwd, manifestStarterPath),
+        manifestStarter(routes, { dir: src, manifestPath: manifestStarterPath }),
+      );
+      manifestWritten =
+        routes.length > 0
+          ? `${manifestStarterPath} (${routes.length} route${routes.length === 1 ? "" : "s"} discovered)`
+          : `${manifestStarterPath} (no route convention detected — one placeholder entry)`;
+    }
+  } finally {
+    prompter.close();
+  }
+
   console.log(
     modelExisted
       ? `Kept your existing ${modelPath}.`
       : `Wrote ${modelPath} — export your model there (it throws until you do).`,
   );
+  if (routeWritten !== undefined) console.log(`Wrote ${routeWritten}.`);
+  if (manifestWritten !== undefined) console.log(`Wrote ${manifestWritten}.`);
   console.log("Wrote .agent.json (paths, install-time file hashes).");
   const addedNames = Object.keys(added);
   if (addedNames.length > 0) {
@@ -195,30 +319,60 @@ export async function runInit(argv: string[], cliVersion: string): Promise<void>
     );
   }
 
+  // What is left is only what init could not do for this project, so the list
+  // shrinks as detection succeeds. A step that reads "already done" is noise;
+  // a step that is missing is a broken install.
   const caveat = layout
     ? ""
     : "\n     (that path is from the project root — adjust it to the importing file).";
+  const steps: string[][] = [
+    [installCommand(pm)],
+    [
+      `Import the styles once, in ${layout ?? "your root layout"}: import "${styleImportSpecifier(src, layout)}"${caveat}`,
+    ],
+    [
+      `Render <AgentChat api="/api/agent" currentRoute={…} navigate={…} manifest={publicManifest} />`,
+      `from ${dir}, with publicManifest from ${manifestStarterPath}.`,
+    ],
+    [
+      `Export your model from ${modelPath} — until you do, the first request throws`,
+      `naming that file.`,
+    ],
+  ];
+
+  steps.push(
+    manifestWritten !== undefined || exists(manifestStarterPath)
+      ? [
+          `Fill in ${manifestStarterPath}: a description per route, and the target ids`,
+          `the assistant may highlight or click. It is the assistant's entire knowledge`,
+          `of your site — empty descriptions are why one answers "that is not in the`,
+          `site content" to everything.`,
+        ]
+      : [
+          `Describe your pages: a browser-safe AgentPublicManifest (routes + target ids),`,
+          `then withContent(publicManifest, {...}) in a server-only module for the page`,
+          `markdown. Skipping this is why an assistant answers "that is not in the site`,
+          `content".`,
+        ],
+  );
+
+  if (routeWritten === undefined && routePath === undefined) {
+    steps.push([
+      `Mount createAgentHandler on POST /api/agent (snippet below).`,
+    ]);
+  }
+
   console.log("\nNext steps:");
-  console.log(`  1. ${installCommand(pm)}`);
-  console.log(
-    `  2. Import the styles once, in ${layout ?? "your root layout"}: import "${styleImportSpecifier(src, layout)}"${caveat}`,
-  );
-  console.log(
-    `  3. Render <AgentChat api="/api/agent" currentRoute={…} navigate={…} manifest={…} /> from ${dir}.`,
-  );
-  console.log(
-    "  4. Describe your pages: a browser-safe AgentPublicManifest (routes + target ids),",
-  );
-  console.log(
-    `     then withContent(publicManifest, {...}) in a server-only module for the page markdown.`,
-  );
-  console.log(
-    "     Skipping this is why an assistant answers \"that is not in the site content\".",
-  );
-  console.log(
-    `  5. Mount createAgentHandler (from ${src}/server) on POST /api/agent, passing`,
-  );
-  console.log(`     the model you export from ${modelPath}.`);
+  steps.forEach((lines, index) => {
+    console.log(`  ${index + 1}. ${lines[0]}`);
+    for (const line of lines.slice(1)) console.log(`     ${line}`);
+  });
+
+  // A host with no file convention gets the snippet instead of a file.
+  if (routePath === undefined) {
+    console.log("");
+    for (const line of mountHint(host.kind, routeContext)) console.log(line);
+  }
 
   // Printed rather than linked: an adapter installed at `latest`, or a key Vite
   // never puts in process.env, both fail on the first message — too late to go

@@ -9,6 +9,44 @@ import { posix } from "node:path";
 export class CliError extends Error {}
 
 /**
+ * The `init` flags, rendered once. `index.ts` interpolates this into `--help`
+ * and `argvErrorMessage` prints it under a rejected flag, so the help text and
+ * the error can never disagree about which flags exist.
+ */
+export const INIT_OPTIONS_HELP = `  --dir <path>        Where to copy the agent-ui source (default: src/agent)
+  -y, --yes           Accept defaults, never prompt
+  --force             Overwrite an existing .agent.json / non-empty --dir`;
+
+/** The argv failures `parseArgs` raises. Anything else is a real bug, not input. */
+const PARSE_ARGS_CODES = new Set([
+  "ERR_PARSE_ARGS_UNKNOWN_OPTION",
+  "ERR_PARSE_ARGS_INVALID_OPTION_VALUE",
+  "ERR_PARSE_ARGS_UNEXPECTED_POSITIONAL",
+]);
+
+/**
+ * Turn a `parseArgs` failure into a message worth printing.
+ *
+ * `parseArgs` throws a plain `TypeError`, which the entry point rethrows and
+ * Node renders as a stack trace through its own internals — so every mistyped
+ * flag looked like a crash in the CLI rather than a mistake in the command.
+ * Bad input is the one thing a CLI can count on receiving.
+ *
+ * Returns `undefined` for anything that is not an argv error, so callers rethrow
+ * what they cannot explain rather than dressing a real bug up as user error.
+ */
+export function argvErrorMessage(error: unknown): string | undefined {
+  const code = (error as { code?: unknown } | null)?.code;
+  if (typeof code !== "string" || !PARSE_ARGS_CODES.has(code)) return undefined;
+  // Node appends "To specify a positional argument starting with a '-', place
+  // it at the end ... after '--'", which is wrong here: init takes no
+  // positionals, so following it produces a second, more confusing error.
+  const raw = String((error as Error).message);
+  const detail = raw.split(". ")[0] ?? raw;
+  return `${detail.replace(/\.$/, "")}.\n\nOptions for init:\n${INIT_OPTIONS_HELP}`;
+}
+
+/**
  * Reference data for the adapters a consumer can install. The CLI never installs
  * one and never writes provider code — the model is supplied by the consumer at
  * the `agent-model.ts` seam — so this exists purely to print accurate install
@@ -195,10 +233,22 @@ export function providerSetupHint(pm: PackageManager): string[] {
  * `styles.css` already draw: the file you edit and the file we rewrite are
  * different files.
  */
+export function siblingPath(dir: string, name: string): string {
+  const parent = posix.dirname(toPosix(dir).replace(/\/+$/, ""));
+  return parent === "." ? name : `${parent}/${name}`;
+}
+
 export function agentModelPath(dir: string): string {
-  const trimmed = toPosix(dir).replace(/\/+$/, "");
-  const parent = posix.dirname(trimmed);
-  return parent === "." ? "agent-model.ts" : `${parent}/agent-model.ts`;
+  return siblingPath(dir, "agent-model.ts");
+}
+
+/**
+ * The public manifest starter, beside `--dir` for the same reason the model stub
+ * is: describing your pages is the other edit every install needs, and a
+ * hash-tracked directory is the wrong home for a file whose purpose is to grow.
+ */
+export function agentManifestPath(dir: string): string {
+  return siblingPath(dir, "agent-manifest.ts");
 }
 
 /**
@@ -249,45 +299,10 @@ function notConfigured(): LanguageModel {
 `;
 }
 
-/**
- * Where a global stylesheet is conventionally imported, framework-specific
- * entries before the generic ones. `init` looks for these so the style-import
- * hint is written from the file the consumer actually pastes it into.
- *
- * Order is the contract: the outermost module wins. A framework project often
- * still carries a `src/main.tsx` (migration leftovers, or a router SPA that has
- * both), so every framework root has to sort above the generic tail or the hint
- * names the wrong file.
- */
-export const ROOT_LAYOUT_FILES = [
-  // Next.js App Router
-  "app/layout.tsx",
-  "app/layout.jsx",
-  "src/app/layout.tsx",
-  "src/app/layout.jsx",
-  // React Router v7 framework mode / Remix
-  "app/root.tsx",
-  "app/root.jsx",
-  // TanStack Start / Router (Vite plugin layout, then the older Vinxi one)
-  "src/routes/__root.tsx",
-  "app/routes/__root.tsx",
-  // Plain Vite / CRA
-  "src/main.tsx",
-  "src/main.ts",
-  "src/index.tsx",
-  "src/App.tsx",
-] as const;
-
-/**
- * The first candidate that exists, or `undefined`. `exists` is the caller's
- * filesystem probe, which keeps the precedence order testable here without this
- * module touching `fs` — the same split `detectPackageManager` uses.
- */
-export function pickRootLayout(
-  exists: (file: string) => boolean,
-): string | undefined {
-  return ROOT_LAYOUT_FILES.find(exists);
-}
+// Root layouts and framework detection live in `hosts.ts`: the same paths that
+// tell init where a stylesheet gets imported also tell it which framework this
+// is and where an API route belongs, and one table is easier to keep honest
+// than two lists that must agree.
 
 /**
  * Vite config names, in the order Vite itself resolves them. Presence of one is
@@ -395,18 +410,31 @@ export function reactVersionWarning(pkg: PackageJsonLike): string | undefined {
 }
 
 /**
- * The `styles.css` specifier as written *from* `layout`. A bare
- * `./${dir}/styles.css` is only correct for an importer sitting at the project
- * root, which `src/main.tsx` and `app/layout.tsx` never do — from `src/main.tsx`
- * the same file is `./agent/styles.css`. With no known layout, the path falls
- * back to project-root-relative and the caller says so.
+ * A project-root-relative path rewritten as an import specifier *from* another
+ * file. A bare `./${dir}/styles.css` is only correct for an importer sitting at
+ * the project root, which `src/main.tsx` and `app/layout.tsx` never do — from
+ * `src/main.tsx` the same file is `./agent/styles.css`.
+ *
+ * Every file init writes or describes needs this: the style hint, and each
+ * generated route's imports of `server`, the model, and the manifest. Passing
+ * `undefined` for `fromFile` yields the project-root-relative path, which the
+ * caller then has to flag as needing adjustment.
  */
-export function styleImportSpecifier(dir: string, layout?: string): string {
+export function importSpecifier(target: string, fromFile?: string): string {
   const trimmed = (p: string) => toPosix(p).replace(/\/+$/, "");
-  const target = `${trimmed(dir)}/styles.css`;
-  const from = layout ? posix.dirname(trimmed(layout)) : ".";
-  const rel = posix.relative(from, target);
+  const from = fromFile ? posix.dirname(trimmed(fromFile)) : ".";
+  const rel = posix.relative(from, trimmed(target));
   return rel.startsWith(".") ? rel : `./${rel}`;
+}
+
+/** The `styles.css` specifier as written from the consumer's root layout. */
+export function styleImportSpecifier(dir: string, layout?: string): string {
+  return importSpecifier(`${toPosix(dir).replace(/\/+$/, "")}/styles.css`, layout);
+}
+
+/** Drop a `.ts`/`.tsx` extension: TypeScript import specifiers do not carry one. */
+export function withoutExtension(path: string): string {
+  return path.replace(/\.(tsx?|jsx?)$/, "");
 }
 
 /**

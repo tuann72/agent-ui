@@ -1,5 +1,9 @@
 import type { UIDataTypes, UIMessage } from "ai";
 
+import type { AgentClientToolName, AgentToolName } from "./contract";
+// Type-only, so zod never enters the client bundle. See contract.schemas.ts.
+import type { ToolInput } from "./contract.schemas";
+
 export interface AgentTarget {
   id: string;
   description: string;
@@ -64,23 +68,19 @@ export interface AgentHighlightOptions {
 
 export type ToolPolicy = "auto" | "confirm" | "disabled";
 
-export interface AgentToolPolicies {
-  navigate: ToolPolicy;
-  highlight: ToolPolicy;
-  interact: ToolPolicy;
-}
+/**
+ * One policy per client-executed tool. Server-executed tools are absent by
+ * construction: they never reach the browser as an action, so there is nothing
+ * for a policy to gate.
+ */
+export type AgentToolPolicies = Record<AgentClientToolName, ToolPolicy>;
 
-export interface NavigateInput {
-  route: string;
-}
-
-export interface HighlightInput {
-  target: string;
-}
-
-export interface InteractInput {
-  target: string;
-}
+export type {
+  HighlightInput,
+  InteractInput,
+  NavigateInput,
+  SearchContentInput,
+} from "./contract.schemas";
 
 export interface AgentToolOutput {
   ok: boolean;
@@ -95,12 +95,21 @@ export interface AgentToolOutput {
   approvedByUser?: boolean;
 }
 
-export interface AgentTools {
-  navigate: { input: NavigateInput; output: AgentToolOutput };
-  highlight: { input: HighlightInput; output: AgentToolOutput };
-  interact: { input: InteractInput; output: AgentToolOutput };
-  [k: string]: { input: unknown; output: unknown };
-}
+/**
+ * The tool map behind `AgentUIMessage`. Mapped over the contract rather than
+ * listed, so a tool cannot exist on the wire without a typed part here.
+ *
+ * Only client-executed tools carry `AgentToolOutput` — that shape is what
+ * `tool-policy.ts` returns. A server-executed tool's result is whatever its
+ * `execute` returned, which core cannot name without importing server types and
+ * inverting the dependency, so it stays `unknown`.
+ */
+export type AgentTools = {
+  [K in AgentToolName]: {
+    input: ToolInput<K>;
+    output: K extends AgentClientToolName ? AgentToolOutput : unknown;
+  };
+};
 
 export type AgentUIMessage = UIMessage<unknown, UIDataTypes, AgentTools>;
 

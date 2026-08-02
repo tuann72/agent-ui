@@ -31,6 +31,69 @@ newest templates rather than a cached CLI.
 
 ### Added
 
+- **`init` detects your framework and writes the wiring.** It finds the root
+  layout, and from it knows both which framework this is and where that
+  framework's files go — so a project with `src/app/layout.tsx` gets its route
+  at `src/app/api/agent/route.ts`, not a second unrouted tree at `app/`.
+
+  | Framework | Route written to |
+  | --- | --- |
+  | Next.js App Router | `app/api/agent/route.ts` |
+  | React Router v7 / Remix | `app/routes/api.agent.ts` |
+  | TanStack Start | `src/routes/api/agent.ts` |
+  | Hono, Vite SPA | printed, not written |
+
+  Hono and a Vite SPA mount into a file that already exists with your code in
+  it, and `init` does not edit files it did not create. Those get a complete
+  snippet instead — imports, `withContent`, and the mount — so it is a paste
+  rather than a starting point.
+
+  Mounting the handler was the one step `init` could only describe in prose, and
+  it is the step that decides whether an install works at all: without a route
+  the panel opens and every message fails. It was also most of the README —
+  sections 4 and 5 were 271 of 844 lines, long because the CLI copied the
+  handler factory but not the mount.
+
+- **`init` writes an `agent-manifest.ts` starter**, beside `--dir` like the
+  model stub and for the same reason. Routes are discovered where a framework
+  has a convention that can be read off the filesystem — Next's
+  `app/**/page.tsx` and TanStack's `src/routes/**`, with route groups stripped
+  and dynamic segments skipped.
+
+  Descriptions are left empty and `targets` bare, on purpose. Neither is
+  discoverable, and a plausible-looking wrong description is the kind of thing
+  that survives review. React Router discovers nothing at all: its routes are
+  declared in `routes.ts` as code, and `withContent` throws on a route the
+  public manifest does not declare, so a wrong guess would be a failed first
+  request rather than a cosmetic error.
+
+- **`init` asks before writing** the route and the manifest starter. Every
+  question has a default, and `--yes` or a non-TTY stdin takes it without
+  asking — a piped or CI run behaves exactly as it did before prompts existed.
+
+- **The tool contract is a file you can import.** `core/contract.ts` declares
+  the tool names, their `tool-*` transcript part types, their descriptions, and
+  the prompt rules that stop being true without them — the ordering protocol
+  and the line telling the model the client enforces approval independently.
+  `core/contract.schemas.ts` holds the zod input schemas and is where the
+  client's input types are now inferred from.
+
+  This matters if you replace the bundled handler: your route has to declare
+  the same four tools, by the same names, with the same schemas, and teach the
+  model the same ordering rules, or this client receives calls it will not
+  execute. That was previously only written down in a README. Now it is an
+  import, and `registry/src/index.ts` exports it.
+
+  Internally it closes a drift surface: the names had been retyped in seven
+  places with nothing checking they agreed, and `AgentTools` carried an index
+  signature that let a misspelled tool name typecheck. The one that bit was the
+  request part allowlist — a tool missing from it works on the turn it runs and
+  400s the request after it, when the transcript comes back carrying a part
+  type the server does not know. Everything derives from the contract now.
+
+  No prompt text or schema changed: the assembled system prompt is byte-for-byte
+  what it was, and the four descriptions moved unedited.
+
 - `init` writes an `agent-model.ts` stub beside `--dir` (`src/agent-model.ts`
   by default) exporting the `LanguageModel` the handler runs on. It sits outside
   `--dir` because everything in there is hash-tracked for the future
@@ -56,8 +119,29 @@ newest templates rather than a cached CLI.
     placed key still fails the first message with `AI_LoadAPIKeyError`, one step
     past the last one init used to describe.
 
+### Fixed
+
+- A mistyped flag prints an error and the option list instead of a Node stack
+  trace. `parseArgs` throws a plain `TypeError`, which the entry point rethrew
+  and Node rendered through its own internals, so `--provider` — the likeliest
+  wrong flag, having been a real one until this release — looked like the CLI
+  crashing rather than the command being wrong. Missing option values and stray
+  positionals are covered too, and the option list is now written once and
+  shared by `--help` and the error.
+
 ### Changed
 
+- The README leads with what `init` produces rather than with a five-step
+  checklist. Two of those steps are now the CLI's job, and the sections
+  describing them are reference material for changing what it wrote rather than
+  instructions for doing it by hand.
+- The three consumer-owned files (`agent-model.ts`, `agent-manifest.ts`, and the
+  generated route) are never overwritten, `--force` included. `--force`
+  re-scaffolds agent-ui's source; it has never had a reason to touch yours.
+- Documentation leads with what the UI is built on: the chat client uses
+  `@ai-sdk/react` and speaks the AI SDK v5 UI-message stream. Replacing the
+  bundled handler is supported; replacing the protocol is not, and saying so
+  where people decide costs nothing.
 - The supported React floor is 18, down from 19. `@ai-sdk/react` peers on
   `^18 || ^19` and `react-markdown` on `>=18`, and no React 19-only API appears
   in the templates, so the previous requirement was a claim rather than a

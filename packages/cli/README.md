@@ -4,6 +4,13 @@ Scaffold **Agent**, a portable AI assistant for React, into your project. The
 CLI copies the source into your repo: you own and can edit every file, and there
 is **no runtime npm dependency on agent-ui**.
 
+It is the UI layer for an [AI SDK v5](https://ai-sdk.dev) backend. The chat
+client is built on `@ai-sdk/react` and speaks the AI SDK v5 UI-message stream;
+the bundled handler produces it, and a route you write instead of it must too.
+The scaffolded `core/contract.ts` declares the tool names, schemas, and prompt
+rules both halves share, so your own backend imports them rather than
+reimplementing them.
+
 ```bash
 npx @tuann72/agent-ui@latest init
 # or
@@ -55,21 +62,42 @@ a reload starts a new thread. The repo README covers all three.
    `remark-gfm`, `zod`) to your `package.json`, plus `@types/node` and
    `@types/react` in `devDependencies`, since the scaffolded `server/node.ts`
    imports `node:http`. **No provider adapter** — see below.
-4. Writes an `agent-model.ts` stub *beside* `--dir` (so `src/agent-model.ts` by
-   default). Everything inside `--dir` is hash-tracked for a future
-   `agent-ui update`; a file you are meant to edit does not belong in a
-   directory we rewrite. An existing one is never overwritten, `--force`
-   included.
-5. Warns, with the fix inline, about the things that break *after* init
+4. Detects your framework and writes the wiring for it:
+
+   | Framework | Detected by | Route written to |
+   | --- | --- | --- |
+   | Next.js App Router | `app/layout.tsx` | `app/api/agent/route.ts` |
+   | React Router v7 / Remix | `app/root.tsx` | `app/routes/api.agent.ts` |
+   | TanStack Start | `src/routes/__root.tsx` | `src/routes/api/agent.ts` |
+   | Hono | the `hono` dependency | printed, not written |
+   | Vite SPA | `src/main.tsx` | printed, not written |
+
+   Hono and a Vite SPA mount into a file that already exists with your code in
+   it, and `init` does not edit files it did not create — so those get a
+   complete snippet printed instead, imports and all.
+5. Writes `agent-model.ts` and `agent-manifest.ts` *beside* `--dir` (so
+   `src/agent-model.ts` and `src/agent-manifest.ts` by default). The manifest
+   starter is seeded with routes discovered from your framework's file
+   conventions, with descriptions left empty for you to fill in.
+6. Warns, with the fix inline, about the things that break *after* init
    succeeds: a `tsconfig` pinning `"types"` (which replaces automatic
    `@types/*` pickup, so `server/node.ts` fails your next build even though
    `@types/node` was added), a declared React major below 18, and — when it
    finds a `vite.config.*` — the `loadEnv` bridge, without which the first
    message fails with `AI_LoadAPIKeyError`.
 
+**The three generated files are yours and are never overwritten**, `--force`
+included: `--force` re-scaffolds our source, not your edits. They sit beside
+`--dir` rather than inside it because everything in there is hash-tracked for a
+future `agent-ui update`, and a file you are meant to edit does not belong in a
+directory we rewrite.
+
 Versions you already declare are never overwritten, and nothing moves between
 dependency sections. `init` does not run the install itself; it prints the
 command for you to run.
+
+Run without `--yes` and it asks before writing the route and the manifest. With
+`--yes`, or when stdin is not a TTY, it takes the defaults and asks nothing.
 
 ### You choose the model
 
@@ -126,10 +154,7 @@ import "./agent/styles.css";
 
 // 3. render the assistant
 import { AgentChat } from "./agent";
-
-// 4. mount the handler on your API route
-import { createAgentHandler } from "./agent/server";
-import { model } from "./agent-model";
+import { publicManifest } from "./agent-manifest";
 ```
 
 `init` prints step 2 with the specifier already written for your project: it
@@ -138,15 +163,18 @@ TanStack `src/routes/__root.tsx`, Vite `src/main.tsx`, and the usual variants)
 and computes the path relative to that file. If it finds none, it prints a
 project-root path and says so, for you to adjust.
 
-Two more steps decide whether it actually works, and both are easy to skip:
+The API route is already written (or printed, on Hono and Vite SPAs) — see the
+table above. Two steps remain, and both are easy to skip:
 
-5. **Describe your pages.** Write a browser-safe `AgentPublicManifest` (routes,
-   titles, descriptions, target ids), then `withContent(publicManifest, {...})`
-   in a server-only module to attach the page markdown and keywords. This
+4. **Fill in `agent-manifest.ts`.** `init` seeds the routes where your framework
+   has a discoverable convention, but leaves every description empty and every
+   `targets` array bare, because neither can be read off the filesystem. This
    manifest is the assistant's *entire* knowledge of your site — nothing is
-   crawled from the DOM — so an empty one means "that is not in the site
-   content" as the answer to everything.
-6. **Put the provider key in a server-side `.env`** at your project root, using
+   crawled from the DOM — so an unfilled one means "that is not in the site
+   content" as the answer to everything. Page markdown goes in the
+   `withContent(publicManifest, {...})` call in your route, which keeps it
+   server-side.
+5. **Put the provider key in a server-side `.env`** at your project root, using
    the exact variable name the adapter expects (`OPENAI_API_KEY`,
    `ANTHROPIC_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`), and restart. Never
    prefix it `VITE_` or `NEXT_PUBLIC_`: those prefixes exist to ship a value to
