@@ -131,6 +131,45 @@ Vite SPAs have no server routes; mount the Node bridge (`toNodeHandler` from
 ["vite/client"]`, add `"node"`, or `server/node.ts` fails the next build — an
 explicit array replaces automatic `@types/*` pickup.
 
+`model` and `manifest` are required; everything else is optional.
+
+| Option | Default | Purpose |
+| --- | --- | --- |
+| `system` | none | Persona appended to the base prompt. The security preamble is never removable |
+| `agent` | none | The same thing, structured: `role`, `audience`, `voice[]`, `goals[]`, `behaviors[]` |
+| `limits` | see below | Request and generation caps |
+| `allowedOrigins` | the request's own origin | Anything else gets 403 |
+| `authorize` | none | `(request) => boolean \| Promise<boolean>`. False answers 401 |
+| `onError` | none | Return a string to replace the client-visible stream error |
+
+`system` and `agent` are **trusted** prompt material: they render above the
+delimited page context, as instructions rather than data, so they may only ever
+be written in server code. Browser requests cannot supply them, and a `system`
+role in a request body is rejected outright.
+
+`onError` is where a stream failure becomes visible. By default the real error
+is logged with `console.error` and the client sees only "An error occurred." —
+returning a string replaces that message, and returning nothing keeps the mask.
+Nothing leaks either way; the default is quiet, not silent.
+
+`allowedOrigins` is checked only when the request carries an `Origin` header,
+which browsers send on cross-origin POSTs. A request with no `Origin` at all —
+curl, a server-to-server call — is not an origin violation and is not treated as
+one. `authorize` is the hook that covers those.
+
+Every `limits` field is clamped: configuration can lower a limit, never raise it
+past its ceiling. They are security caps, not tuning knobs.
+
+| `limits` field | Default | Ceiling |
+| --- | --- | --- |
+| `maxBodyBytes` | 200,000 | 1,000,000 |
+| `maxMessages` | 40 | 100 |
+| `maxMessageChars` | 8,000 | 32,000 |
+| `maxOutputTokens` | 1,024 | 4,096 |
+| `maxToolSteps` | 4 | 8 |
+| `maxDurationMs` | 30,000 | 120,000 |
+| `contextBudgetChars` | 40,000 | 200,000 |
+
 **Replacing the handler** is supported; the client expects four tools by exact
 name and schema, so import `TOOL_DESCRIPTIONS`, `TOOL_ORDERING_PROTOCOL`, and
 `TOOL_SECURITY_RULE` from `./agent`, plus `toolInputSchemas` from
@@ -139,10 +178,12 @@ prompt. `navigate`, `highlight`, and `interact` must be declared **without an
 `execute`**: the SDK forwards them to the browser, where the approval policy is
 applied, so a server-side executor bypasses every approval the UI offers.
 
-**Rate limiting is your job.** `POST /api/agent` is unauthenticated and spends
-money per request. The handler bounds request *shape* — `allowedOrigins` (403),
-body bytes, message count and length (413) — never *volume*. Put a limit in
-front of the route and a spend cap at your provider.
+**Rate limiting is your job.** `POST /api/agent` is unauthenticated by default
+and spends money per request. The handler bounds request *shape* —
+`allowedOrigins` (403), `authorize` (401), body bytes (413), message count and
+length (400) — never *volume*. `authorize` will gate the route on a session, but
+it runs per request and counts nothing, so it is not a rate limit either. Put a
+real limit in front of the route and a spend cap at your provider.
 
 ## Configure the UI
 
@@ -156,8 +197,16 @@ Required props are `api`, `currentRoute`, `navigate`, and `manifest`.
 | `detachable` | `false` | Offer detach: the panel becomes a floating, draggable window |
 | `selectionAsk` / `selectionSide` | `true` / `"top"` | Selection-to-chat popover |
 | `starterPrompts` | none | `{ label, prompt }` suggestions before the first message |
+| `header` / `inputSeparator` | standard / `true` | Dock/sidebar header (`false` removes it, a node replaces it) and the rule above the input |
+| `shortcutKey` | `"/"` | Spotlight open key. A bare key, ignored while typing or with a modifier held |
 | `highlightOptions` | built-in | Duration, padding, border, fill, ring, shadow, pulse, `className` |
 | `toolPolicy` | see below | Per-tool `auto`, `confirm`, or `disabled` |
+| `maxNavigationsPerTurn` / `maxInteractionsPerTurn` | `2` / `3` | Page actions one turn may spend, clamped 0–10 |
+| `maxPendingSelections` | `8` | Selected-text pills one message may carry, clamped 1–8 |
+
+The three caps are per *turn*, not per conversation, and a replay gets its own
+fresh budget rather than drawing down the turn's — so they bound a runaway loop
+without making the replay button spend the conversation's allowance.
 
 Tool defaults are highlight `auto`, navigate `confirm`, interact `confirm`;
 auto-approve skips confirmation but never re-enables a `disabled` tool.

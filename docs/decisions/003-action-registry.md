@@ -1,10 +1,15 @@
 # ADR 003: Extend Agent with semantic registered actions
 
-Status: accepted
+Status: accepted, not implemented. Nothing in this ADR ships, and none of it is
+scheduled — V1 covers the same ground with the four contract tools, whose
+enforcement lives in `core/tool-policy.ts` and `useAgentChat`. Read this as the
+shape a registry would take if one is ever built, not as work owed. `interact`
+is the shipped click tool and is not a stopgap for it: the registry would sit
+beside `interact`, not replace it.
 
 ## Decision
 
-Capabilities beyond navigation, highlighting, and the legacy click tool use a
+Capabilities beyond navigation, highlighting, and clicking (`interact`) use a
 consumer-defined action registry. Every action has a stable id, description,
 schema, risk level, policy, per-turn cap, and exactly one registered executor.
 
