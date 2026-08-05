@@ -23,7 +23,13 @@
     // Some stricter flags (disabled by default)
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noPropertyAccessFromIndexSignature": false
+    "noPropertyAccessFromIndexSignature": false,
+
+    // See registry/tsconfig.json: TypeScript 6 no longer sweeps
+    // `node_modules/@types` on its own, and `bun:test` is a global here too.
+    // Only `bun` is listed: this package declares no `@types/node`, and its
+    // `node:*` imports resolve as modules, which `types` does not govern.
+    "types": ["bun"]
   },
   // templates/ is generated registry source whose deps aren't installed here;
   // it is typechecked at its origin (registry/), not in this package.

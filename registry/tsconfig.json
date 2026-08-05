@@ -1,7 +1,15 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": {
-    "lib": ["ESNext", "DOM", "DOM.Iterable"]
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    // Named explicitly because TypeScript 6 dropped the automatic sweep of
+    // `node_modules/@types`. Without this, `bun:test` resolves under 5.x and
+    // fails under 6.x — and which one runs was decided by whichever workspace's
+    // tsc won hoisting, so the repo typechecked locally and failed in CI.
+    // This is the same trap the README documents for consumers: an explicit
+    // array *replaces* the automatic pickup, so anything providing globals has
+    // to be listed. Types reached through imports (react, react-dom) do not.
+    "types": ["bun", "node"]
   },
   "include": ["src"]
 }

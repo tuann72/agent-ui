@@ -85,7 +85,18 @@ newest templates rather than a cached CLI.
   manifest to `src/lib/agent-manifest.ts`, re-run under `--force`, and it found
   nothing at `src/agent-manifest.ts` and wrote a second starter there — a stray
   file beside the real one, and the same hole for the model stub and the route.
-  A re-run now looks where the files actually are.
+  A re-run now looks where `paths` says the files are.
+
+  Note the seam: nothing updates `paths` when you move a file. `init` records
+  where it put things, and honors that on the next run — so **if you relocate
+  one of the three, edit `paths` to match**, or the stray copy comes back.
+  Finding a moved manifest automatically would mean globbing for a file that
+  exports `publicManifest`, and a wrong guess there is worse than no guess.
+
+  A recorded path is also trusted without checking the project: delete a
+  relocated file and the next run rewrites it where `paths` points, not at the
+  default. The alternative — silently falling back — would relocate your file
+  whenever it was briefly absent, which is the harder failure to notice.
 
   A `.agent.json` that is missing, damaged, or written by an older CLI simply
   contributes nothing, and `init` falls back to the defaults it has always used.

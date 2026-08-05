@@ -107,3 +107,55 @@ jobs:
           npx json -I -f tsconfig.json -e 'this.include=["src","app"]' 2>/dev/null \
             || node -e 'const f="tsconfig.json",j=require("./"+f);j.include=["src","app"];require("fs").writeFileSync(f,JSON.stringify(j,null,2))'
           npx tsc -p .
+
+      # Every job above scaffolds into an empty directory, so the re-run path —
+      # read .agent.json, reuse its `paths`, write it back — never executes. The
+      # case that matters is an *older* config: it has no `paths` at all, and a
+      # consumer who relocated a file recorded that by hand.
+      - name: A re-run honours an older config and the paths in it
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/next-consumer"
+
+          # Rewind to what 0.2.0 wrote: a `content` key, and no `paths`.
+          node -e '
+            const f = ".agent.json", j = require("./" + f);
+            delete j.paths;
+            j.cli = "0.2.0";
+            j.content = "content/agent";
+            require("fs").writeFileSync(f, JSON.stringify(j, null, 2));
+          '
+          # Relocate the manifest the way a consumer would, without telling init.
+          mkdir -p src/lib
+          mv src/agent-manifest.ts src/lib/agent-manifest.ts
+
+          npx agent-ui init --yes --force
+          test -f .agent.json || { echo "config was destroyed"; exit 1; }
+
+          # An older config carries no paths, so this run falls back to the
+          # defaults and writes a manifest at the standard location.
+          node -e '
+            const j = require("./.agent.json");
+            if (!j.paths) { console.error("paths not recorded"); process.exit(1); }
+            if (j.content !== undefined) { console.error("content came back"); process.exit(1); }
+            if (j.paths.manifest !== "src/agent-manifest.ts") {
+              console.error("unexpected manifest path: " + j.paths.manifest);
+              process.exit(1);
+            }
+          '
+
+          # Now the paths are recorded. Point one at the relocated file and
+          # confirm a further re-run leaves it alone instead of duplicating it.
+          rm src/agent-manifest.ts
+          node -e '
+            const f = ".agent.json", j = require("./" + f);
+            j.paths.manifest = "src/lib/agent-manifest.ts";
+            require("fs").writeFileSync(f, JSON.stringify(j, null, 2));
+          '
+          echo "// consumer edit" >> src/lib/agent-manifest.ts
+          npx agent-ui init --yes --force
+
+          test -f src/lib/agent-manifest.ts || { echo "recorded manifest lost"; exit 1; }
+          test ! -f src/agent-manifest.ts || { echo "stray manifest at the default path"; exit 1; }
+          grep -q "consumer edit" src/lib/agent-manifest.ts \
+            || { echo "consumer edits were overwritten"; exit 1; }

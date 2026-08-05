@@ -541,6 +541,46 @@ describe("buildAgentConfig", () => {
     expect(live.toSorted()).toEqual(Object.keys(config).toSorted());
     expect(Object.keys(schema.properties)).toContain("content");
   });
+
+  test("a 0.2.0 config still validates against the current schema", () => {
+    // Frozen on purpose: this is a file an older CLI wrote, and every install
+    // in the wild has one. The schema is published, so tightening `required`
+    // would break editor validation for all of them — and the test above would
+    // not notice, because it only ever looks at a freshly built config, which
+    // always has every key the schema could ask for.
+    const before = {
+      $schema: AGENT_CONFIG_SCHEMA_URL,
+      cli: "0.2.0",
+      dir: "src/agent",
+      content: "content/agent",
+      files: { "index.ts": "a".repeat(64) },
+    };
+    const schema = JSON.parse(
+      readFileSync(new URL("../schema.json", import.meta.url), "utf8"),
+    ) as {
+      required: string[];
+      additionalProperties: boolean;
+      properties: Record<string, unknown>;
+    };
+
+    for (const key of schema.required) {
+      expect(Object.keys(before)).toContain(key);
+    }
+    // `additionalProperties: false` is what makes a retired key a breaking
+    // removal rather than a harmless one.
+    expect(schema.additionalProperties).toBe(false);
+    for (const key of Object.keys(before)) {
+      expect(Object.keys(schema.properties)).toContain(key);
+    }
+  });
+
+  test("an older config contributes no paths, so init uses its defaults", () => {
+    expect(
+      readAgentPaths(
+        JSON.stringify({ cli: "0.2.0", dir: "src/agent", content: "content/agent" }),
+      ),
+    ).toEqual({});
+  });
 });
 
 describe("readAgentPaths", () => {

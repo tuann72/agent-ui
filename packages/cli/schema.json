@@ -27,7 +27,7 @@
     },
     "paths": {
       "type": "object",
-      "description": "Where the files init writes beside `dir` live. A re-run reuses these, so a file you moved is found rather than duplicated at the default path.",
+      "description": "Where the files init writes beside `dir` live. A re-run reuses these instead of the defaults. Nothing updates them for you: if you move one of these files, edit its entry here, or the next run writes a fresh copy at the recorded path.",
       "additionalProperties": false,
       "required": ["model", "manifest"],
       "properties": {
