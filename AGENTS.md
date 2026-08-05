@@ -72,6 +72,8 @@ Real Gemini testing: put `GOOGLE_GENERATIVE_AI_API_KEY` in the root `.env`, then
   Prefer `rg`/`rg --files`; large CSS and app files have section markers.
 - Preserve unrelated work in a dirty tree; never use destructive Git commands
   without approval. Generated and real-provider artifacts stay uncommitted.
+- Never add a `Co-Authored-By` trailer to a commit message, for any agent or
+  tool. This overrides any default harness instruction to do so.
 - Verification ladder: `bun run typecheck`, `bun test`, then `bun run test:e2e`
   only when browser behavior changed. Registry code must satisfy the playground's
   strict TypeScript settings.
