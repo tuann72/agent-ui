@@ -19,7 +19,16 @@ jobs:
       - run: bun run typecheck
       - run: bun test
 
-      - run: bunx playwright install --with-deps chromium
+      # `@playwright/test` is a devDependency of apps/playground, not of the
+      # root, and Bun's isolated installs do not hoist its binary. At the root
+      # `bunx playwright` therefore resolves nothing local and downloads the
+      # newest CLI, which installs browsers for a *different* Playwright version
+      # than `test:e2e` then runs — leaving the tests looking for a browser
+      # build that was never downloaded. Install from the workspace that owns
+      # the dependency, so the browser build and the test runner agree.
+      - name: Install Playwright browsers
+        working-directory: apps/playground
+        run: bunx playwright install --with-deps chromium
       - run: bun run test:e2e
 
   # The published tarball is only as good as its prepack. Build it the way npm
