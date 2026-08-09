@@ -8,7 +8,7 @@ Because the CLI bundles its own templates, a version bump is also a bump of the
 scaffolded source: run `npx @tuann72/agent-ui@latest init` to scaffold from the
 newest templates rather than a cached CLI.
 
-## [Unreleased]
+## [0.3.0] - 2026-08-09
 
 ### Removed
 
@@ -158,6 +158,16 @@ newest templates rather than a cached CLI.
     past the last one init used to describe.
 
 ### Fixed
+
+- The Next.js render example is a client component. `navigate` is a function
+  prop, so `<AgentChat>` cannot be rendered from the App Router's
+  server-component layout — the documented snippet could not work as written,
+  and every reader had to rediscover the `"use client"` wrapper.
+- The Vite guide covers `tsconfig.node.json`, not just `tsconfig.app.json`.
+  Importing the handler into `vite.config.ts` pulls the scaffolded source into
+  that Node-flavored project, where `nodenext` resolution, a DOM-less `lib`,
+  and no `jsx` failed `tsc -b` — so the documented setup broke `npm run build`
+  on a stock `create-vite` project.
 
 - A mistyped flag prints an error and the option list instead of a Node stack
   trace. `parseArgs` throws a plain `TypeError`, which the entry point rethrew

@@ -158,6 +158,13 @@ import { AgentChat } from "./agent";
 import { publicManifest } from "./agent-manifest";
 ```
 
+`navigate` is a function prop, so on the Next.js App Router step 3 goes in a
+`"use client"` component that reads `usePathname()` and `useRouter()`, which
+your layout then renders — `<AgentChat>` cannot be returned from a server
+component. Vite SPA users importing the handler into `vite.config.ts` need
+bundler resolution, `"DOM"` in `lib`, and `"jsx"` in `tsconfig.node.json`. The
+repo README has both in full.
+
 `init` prints step 2 with the specifier already written for your project: it
 looks for a root layout (Next.js `app/layout.tsx`, React Router `app/root.tsx`,
 TanStack `src/routes/__root.tsx`, Vite `src/main.tsx`, and the usual variants)

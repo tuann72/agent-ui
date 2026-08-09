@@ -1,6 +1,6 @@
 {
   "name": "@tuann72/agent-ui",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Scaffold Agent — a portable AI assistant for React — into your project. Copies the source into your repo; you own every file, no runtime dependency on agent-ui.",
   "keywords": [
     "ai",

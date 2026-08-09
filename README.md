@@ -56,20 +56,36 @@ provider key means publishing it. Next.js and Bun load `.env` themselves; plain
 Node running Vite does not, so bridge it in `vite.config.ts` with
 `Object.assign(process.env, loadEnv(mode, process.cwd(), ""))`.
 
-**3. Render it.**
+**3. Render it.** `navigate` is a function prop, so on the Next.js App Router
+this is a client component — `<AgentChat>` cannot go straight into the
+server-component layout.
+
 ```tsx
-import "./agent/styles.css";
+// src/agent-mount.tsx
+"use client";
+import { usePathname, useRouter } from "next/navigation";
 import { AgentChat } from "./agent";
 import { publicManifest } from "./agent-manifest";
 
-<AgentChat api="/api/agent" currentRoute={pathname}
-  navigate={(route) => router.push(route)} manifest={publicManifest} />;
+export function AgentMount() {
+  const router = useRouter();
+  return <AgentChat api="/api/agent" currentRoute={usePathname()}
+    navigate={(route) => router.push(route)} manifest={publicManifest} />;
+}
+```
+```tsx
+// app/layout.tsx — import the styles once, anywhere that loads on every page
+import "../src/agent/styles.css";
+import { AgentMount } from "../src/agent-mount";
+// …then render <AgentMount /> inside <body>.
 ```
 
-Give `navigate` your router's *client-side* push: conversations live in React
-state and are never persisted, so one that reloads the page ends the thread
-mid-answer. `theme.css`, imported by `styles.css`, holds colors, radius, and sizing
-— that file is yours, and an update leaves it alone.
+Elsewhere — React Router, TanStack, a Vite SPA — render `<AgentChat>` directly
+with that router's `pathname` and push. Give `navigate` the *client-side* push:
+conversations live in React state and are never persisted, so one that reloads
+the page ends the thread mid-answer. `theme.css`, imported by `styles.css`,
+holds colors, radius, and sizing — that file is yours, and an update leaves it
+alone.
 
 ## Site knowledge
 
@@ -127,9 +143,16 @@ app.post("/api/agent", (c) => handler(c.req.raw));                              
 ```
 
 Vite SPAs have no server routes; mount the Node bridge (`toNodeHandler` from
-`./agent/server/node`) as dev middleware. If `tsconfig.app.json` pins `"types":
-["vite/client"]`, add `"node"`, or `server/node.ts` fails the next build — an
-explicit array replaces automatic `@types/*` pickup.
+`./agent/server/node`) as dev middleware. Two tsconfig caveats, both of which
+fail *later*, at `tsc -b`, naming neither cause:
+
+- `tsconfig.app.json`: if it pins `"types": ["vite/client"]`, add `"node"`, or
+  `server/node.ts` fails — an explicit array replaces automatic `@types/*` pickup.
+- `tsconfig.node.json` (it owns `vite.config.ts`): importing the handler there
+  pulls the scaffolded source into that project, which on a stock `create-vite`
+  app is Node-flavored and rejects it. Set `"module": "esnext"` with
+  `"moduleResolution": "bundler"`, add `"DOM"` to `lib`, and add
+  `"jsx": "react-jsx"`.
 
 `model` and `manifest` are required; everything else is optional.
 
@@ -233,6 +256,8 @@ swap without prop wiring or weakened enforcement. Editing `isInteractable`,
 | Provider 401/403 in the server log | Wrong, or `VITE_`/`NEXT_PUBLIC_`-prefixed, variable name |
 | "Not in the site content" for everything | Fill in `withContent`; keys must match manifest routes |
 | The thread empties after navigating | `navigate` reloaded the page; pass a client-side push |
+| Next.js: functions cannot be passed to client components | Wrap `<AgentChat>` in a `"use client"` component |
+| `TS2834`/`TS2835` from `vite.config.ts` | `tsconfig.node.json` needs bundler resolution, `DOM`, and `jsx` |
 
 ## Develop this repository
 
