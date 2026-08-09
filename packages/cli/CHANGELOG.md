@@ -10,6 +10,11 @@ newest templates rather than a cached CLI.
 
 ## [0.3.0] - 2026-08-09
 
+The first release installable from npm. 0.1.0 and 0.2.0 were both withdrawn
+(see below), and npm never allows a withdrawn version number to be reused, so
+the numbering moves on rather than back. Everything those entries describe
+ships here too.
+
 ### Removed
 
 - **`--provider`, and everything behind it.** `init` no longer prompts for a
@@ -226,11 +231,11 @@ newest templates rather than a cached CLI.
   documented flow — `withContent` in your route — is the opposite convention.
   The comment shipped into every consumer's repo.
 
-## [0.2.0] - 2026-08-01
+## [0.2.0] - 2026-08-01 — withdrawn
 
-The effective initial release on npm. 0.1.0 was published and then unpublished;
-npm does not allow a withdrawn version number to be reused, so the version
-starts again here. Everything 0.1.0 contained ships in this release too.
+Not installable from npm. Intended as the replacement for the withdrawn 0.1.0,
+it was itself withdrawn before anyone could depend on it. Everything below is
+carried forward into 0.3.0.
 
 ### Added
 
@@ -305,8 +310,8 @@ starts again here. Everything 0.1.0 contained ships in this release too.
 
 ## [0.1.0] - 2026-07-28 — withdrawn
 
-Published to npm and later unpublished. Do not use; its contents are carried
-forward into 0.2.0.
+Published to npm and later unpublished, so it is not installable. Its contents
+are carried forward into 0.2.0 and from there into 0.3.0.
 
 `agent-ui init` copies the bundled registry templates into a consumer project,
 writes `.agent.json` with install-time file hashes, and adds the required
