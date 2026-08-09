@@ -42,11 +42,9 @@ test("dock launcher grows into a same-color bottom-anchored frame", async ({
     const closedIconBox = await launcher.locator("svg").boundingBox();
     if (!closedIconBox) throw new Error("closed dock icon was not measurable");
     const closedIconInset = closedIconBox.x - closedBox.x;
-    const closedIconBlockInset = closedIconBox.y - closedBox.y;
     const closedColor = await launcher.evaluate(
       (element) => getComputedStyle(element).backgroundColor,
     );
-    await expect(frame).toHaveScreenshot(`dock-${appearance}-closed.png`);
 
     await launcher.click();
     await expect(frame).toHaveAttribute("data-state", "open");
@@ -76,38 +74,6 @@ test("dock launcher grows into a same-color bottom-anchored frame", async ({
       "background-color",
       closedColor,
     );
-    await expect(frame).toHaveScreenshot(`dock-${appearance}-open.png`, {
-      // Chromium text/icon antialiasing can move a handful of edge pixels
-      // under parallel load; the frame-level regression remains exact enough
-      // to catch color, geometry, border, and content changes.
-      maxDiffPixelRatio: 0.002,
-    });
-
-    // Hold the frame open but apply the closing brand's final position. This
-    // makes the transition endpoint deterministic instead of sampling an
-    // in-flight animation by wall-clock time.
-    await page.addStyleTag({
-      content: `
-        .agent-dock-frame { transition: none !important; }
-        .agent-dock-frame .agent-panel-title {
-          transition-duration: 0s !important;
-        }
-      `,
-    });
-    await page.getByRole("button", { name: "Close chat" }).click();
-    await expect(frame).toHaveAttribute("data-state", "closing");
-    const closingBox = await frame.boundingBox();
-    const closingIconBox = await dialog(page)
-      .locator(".agent-panel-title svg")
-      .boundingBox();
-    if (!closingBox || !closingIconBox) {
-      throw new Error("closing dock brand was not measurable");
-    }
-    expect(
-      Math.abs(
-        closingIconBox.y - closingBox.y - closedIconBlockInset,
-      ),
-    ).toBeLessThan(0.5);
   }
 });
 

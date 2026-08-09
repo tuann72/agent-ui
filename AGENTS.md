@@ -279,10 +279,12 @@ Do not weaken these constraints.
   suite boots its own Vite on 5183, never 5173, so it cannot silently test against
   a real provider. Replay coverage must assert no new `/api/agent` request occurs
   and that later actions are skipped after failure, per-action button included.
-- Paint-level defects are asserted as the style contract that removes them, not a
-  screenshot, which records antialiasing and fails on the next machine;
-  `dock-*-closed.png` is the only pixel baseline. Configure e2e tests through the
-  query string, and wait on a rendered affordance before any key press.
+- Paint-level defects are asserted as the style contract that removes them, never
+  a screenshot, which records antialiasing and fails on the next machine. There
+  are **no pixel baselines**: the dock's growth is covered by geometry and
+  computed color instead, because the launcher's width is text-dependent and a
+  baseline captured on one OS fails on every other. Configure e2e tests through
+  the query string, and wait on a rendered affordance before any key press.
 
 ## Site knowledge: what ships vs. what is planned
 
