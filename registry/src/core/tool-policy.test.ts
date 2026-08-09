@@ -121,29 +121,21 @@ describe("validateInteraction", () => {
     ).toBe("target-not-interactive");
   });
 
-  test("names the route an interactive target from another page lives on", () => {
-    expect(validateInteraction(manifest, "/", "start-order")).toEqual({
-      ok: false,
-      reason: "target-on-another-route",
-      expectedRoute: "/pricing",
-    });
-  });
-
-  test("rejects an interactive target no page registers", () => {
-    expect(validateInteraction(manifest, "/", "nowhere").reason).toBe(
-      "unknown-target",
-    );
-  });
-
-  test("rejects unknown current routes", () => {
-    expect(validateInteraction(manifest, "/nope", "start-order").reason).toBe(
-      "unknown-route",
-    );
-  });
-
-  test("rejects non-string targets", () => {
-    expect(validateInteraction(manifest, "/pricing", 42).reason).toBe(
-      "invalid-target",
-    );
+  // Everything before the `interactive` check is the same target lookup
+  // `validateTarget` runs, and is covered against that function above. What is
+  // asserted here is that interaction *delegates* to it rather than growing a
+  // second, drifting copy of the route and shape rules — so a lookup rejection
+  // has to arrive identical, `expectedRoute` included.
+  test("shares one target lookup with validateTarget, verbatim", () => {
+    for (const [route, target] of [
+      ["/", "start-order"], // Real, but on another page.
+      ["/", "nowhere"],
+      ["/nope", "start-order"],
+      ["/pricing", 42],
+    ] as const) {
+      expect(validateInteraction(manifest, route, target)).toEqual(
+        validateTarget(manifest, route, target),
+      );
+    }
   });
 });

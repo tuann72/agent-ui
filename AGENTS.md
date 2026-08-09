@@ -16,7 +16,7 @@ dependency on agent-ui. Models and API keys stay in consumer-owned server code.
   templates, writes `.agent.json` with file hashes, adds dependencies without
   replacing consumer ranges, detects the framework, and writes three
   consumer-owned files beside `--dir` (18, 20).
-- 295 unit/component tests, 21 Playwright flows.
+- 292 unit/component tests, 21 Playwright flows.
 
 Not built: `add`, `sync`, `doctor`, `update`; markdown ingestion; framework
 adapters; ADR 003's action registry. Out of scope, not a backlog: rate limiting
